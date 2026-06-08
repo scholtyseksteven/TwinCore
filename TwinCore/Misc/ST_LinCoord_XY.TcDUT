@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <DUT Name="ST_LinCoord_XY" Id="{7006fac1-d820-4c19-b5cb-80184e958f57}">
+    <Declaration><![CDATA[TYPE ST_LinCoord_XY :
+STRUCT
+	x	: REAL;	// [mm]
+	y	: REAL;	// [mm]
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

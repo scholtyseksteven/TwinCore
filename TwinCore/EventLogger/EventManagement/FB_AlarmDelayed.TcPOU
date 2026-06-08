@@ -1,0 +1,74 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <POU Name="FB_AlarmDelayed" Id="{6a476b12-219c-4006-a7f2-800760709ae9}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_AlarmDelayed EXTENDS FB_Alarm
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+	_tDelay		: TIME;
+	_tonDelay	: TON;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="FB_init" Id="{4d787b43-65ce-4bfe-9913-f7ca9a96dac4}">
+      <Declaration><![CDATA[METHOD FB_init : BOOL
+VAR_INPUT
+	bInitRetains : BOOL; // if TRUE, the retain variables are initialized (warm start / cold start)
+	bInCopyCode : BOOL;  // if TRUE, the instance afterwards gets moved into the copy code (online change)
+	
+	stTmpEventClass	: TcEventEntry;
+	tDelay			: TIME;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+_tDelay := tDelay;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="setEvent" Id="{92bd948f-a6e8-4fc8-bfb6-0c625c698ad6}">
+      <Declaration><![CDATA[// must be called cyclically once because of delay timer
+METHOD PUBLIC setEvent : REFERENCE TO FB_Alarm
+VAR_INPUT
+	bSetEvent		: BOOL;	// cyclic call
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+_tonDelay(
+	IN := bSetEvent,
+	PT := _tDelay
+);
+
+SUPER^.setEvent( _tonDelay.Q );
+setEvent REF= THIS^;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="setEventWithOneArgument" Id="{d7022f15-5f79-4ffe-bdcf-a6059bd90642}">
+      <Declaration><![CDATA[// must be called cyclically once because of delay timer
+METHOD PUBLIC setEventWithOneArgument : REFERENCE TO FB_Alarm
+VAR_INPUT
+	bSetEvent		: BOOL;	// cyclic call
+	sInName			: STRING;
+END_VAR
+VAR_INST
+	rtSetEvent		: R_TRIG;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+_tonDelay(
+	IN := bSetEvent,
+	PT := _tDelay
+);
+
+SUPER^.setEventWithOneArgument( _tonDelay.Q, sInName );
+setEventWithOneArgument REF= THIS^;
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

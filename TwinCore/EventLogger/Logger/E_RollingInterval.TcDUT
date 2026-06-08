@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <DUT Name="E_RollingInterval" Id="{3e64c722-d6f3-45a0-ad52-8e3338c4e70a}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'strict'}
+{attrivute 'to_string'}
+// Rolling interval to create a new log file when expired. 
+TYPE E_RollingInterval : (
+    None,
+    Hourly,
+    Daily,
+    Monthly
+);
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

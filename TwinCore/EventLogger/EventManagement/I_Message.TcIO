@@ -1,0 +1,60 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <Itf Name="I_Message" Id="{29e303a1-37cf-42a4-ae53-f66be0ee7e5f}">
+    <Declaration><![CDATA[ INTERFACE I_Message
+]]></Declaration>
+    <Property Name="bSetEvent" Id="{cb40de18-4483-4cdf-b293-f8210e06d40a}">
+      <Declaration><![CDATA[PROPERTY PUBLIC bSetEvent : BOOL]]></Declaration>
+      <Get Name="Get" Id="{4b69e6db-0082-4a94-ac77-bb08a7d3dc28}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+      <Set Name="Set" Id="{9a9066ca-a09e-43f5-a62b-86d2e61df84a}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Set>
+    </Property>
+    <Property Name="eSeverity" Id="{a4fdac6c-458c-4351-8e68-e5fc78bd3510}">
+      <Declaration><![CDATA[PROPERTY eSeverity : TcEventSeverity]]></Declaration>
+      <Get Name="Get" Id="{77bbdea2-7372-48bb-bc1b-f48c9a74d994}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+    </Property>
+    <Method Name="GetEventEntry" Id="{367b3bb0-46fe-47cb-921d-07f6b93c3887}">
+      <Declaration><![CDATA[METHOD GetEventEntry : ST_EventEntryTable
+VAR_INPUT
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="GetEventText" Id="{cfa9c3b2-528b-437b-b7b2-9b1894ceaf82}">
+      <Declaration><![CDATA[METHOD GetEventText : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="GetJsonAttribute" Id="{f5c59c20-3e37-456b-a095-00afeb15ec6d}">
+      <Declaration><![CDATA[METHOD GetJsonAttribute : HRESULT
+VAR_INPUT
+	sJsonAttribute	: REFERENCE TO STRING;
+	nJsonAttribute	: UDINT;
+END_VAR
+]]></Declaration>
+    </Method>
+    <Property Name="LogEntry" Id="{c4cbbc07-2286-4916-9384-73ac6c3f9762}">
+      <Declaration><![CDATA[PROPERTY PUBLIC LogEntry : ST_LogEntry]]></Declaration>
+      <Get Name="Get" Id="{85d98a96-a44a-4cdc-8543-c3b05b4f4a6a}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+    </Property>
+    <Property Name="nGetGroupId" Id="{671a2c41-31cd-48f9-b3e8-95644e74f457}">
+      <Declaration><![CDATA[PROPERTY PUBLIC nGetGroupId : UINT]]></Declaration>
+      <Get Name="Get" Id="{f5b68407-fb60-44f2-83ad-f8a104ca722e}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+    </Property>
+    <Property Name="nGetSourceId" Id="{d68e720f-0552-4a63-be62-df1aa7a0816a}">
+      <Declaration><![CDATA[PROPERTY PUBLIC nGetSourceId : UDINT]]></Declaration>
+      <Get Name="Get" Id="{19de6e31-d718-4955-a341-fb56c4a7b463}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+    </Property>
+  </Itf>
+</TcPlcObject>

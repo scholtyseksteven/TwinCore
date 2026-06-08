@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <POU Name="F_GetFileAgeInSeconds" Id="{37f2c1e8-5447-4301-8712-f9e3f82b01c8}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION F_GetFileAgeInSeconds : DINT
+VAR_INPUT
+    ActualTime    : T_FILETIME;
+    FindFileEntry : ST_FindFileEntry;
+END_VAR
+VAR
+    timeLastWriteAccess : T_ULARGE_INTEGER;
+    fileTimeAsULINT     : T_ULARGE_INTEGER;
+    fileTimeDifference  : T_ULARGE_INTEGER;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[
+// Local file time
+fileTimeAsULINT.dwLowPart := ActualTime.dwLowDateTime;
+fileTimeAsULINT.dwHighPart := ActualTime.dwHighDateTime;
+
+// Write access is UTC
+timeLastWriteAccess.dwLowPart := FindFileEntry.lastWriteTime.dwLowDateTime;
+timeLastWriteAccess.dwHighPart := FindFileEntry.lastWriteTime.dwHighDateTime;
+fileTimeDifference := UInt64Sub64( fileTimeAsULINT, timeLastWriteAccess );
+
+F_GetFileAgeInSeconds := LREAL_TO_DINT( UINT64_TO_LREAL( fileTimeDifference ) / ( 1000 * 1000 * 10 ) );
+]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

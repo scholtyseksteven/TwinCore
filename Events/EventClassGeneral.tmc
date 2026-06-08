@@ -1,0 +1,172 @@
+<?xml version="1.0"?>
+<TcModuleClass>
+	<Translations>
+		<Text TxtId="W_TooManyAlarmsDefined_DisplayText">
+			<Text LcId="1031"><![CDATA[Zu viele Alarme instanziiert (Überprüfe Parameter nMaxNumberAlarms)]]></Text>
+			<Text LcId="1033"><![CDATA[Too many alarms instanciated ( Check parameter nMaxNumberAlarms)]]></Text>
+		</Text>
+		<Text TxtId="W_CyclicCallNotDetected_DisplayText">
+			<Text LcId="1031"><![CDATA[GVL_Diag.gfbAlarmManagement( bInAck := bAck ); muss irgendwo noch zyklisch aufgerufen werden]]></Text>
+			<Text LcId="1033"><![CDATA[You need to call GVL_Diag.gfbAlarmManagement( bInAck := bAck ); somewhere cyclic]]></Text>
+		</Text>
+		<Text TxtId="E_CylHomePos_DisplayText">
+			<Text LcId="1031"><![CDATA[Zylinder konnte die Grundstellung nicht erreichen]]></Text>
+			<Text LcId="1033"><![CDATA[Cylinder could not reach the home position]]></Text>
+		</Text>
+		<Text TxtId="E_CylWorkPos_DisplayText">
+			<Text LcId="1031"><![CDATA[Zylinder konnte die Arbeitsstellung nicht erreichen]]></Text>
+			<Text LcId="1033"><![CDATA[Cylinder could not reach the work position]]></Text>
+		</Text>
+		<Text TxtId="E_CylPair_DisplayText">
+			<Text LcId="1031"><![CDATA[Zylinder-Sensoren nicht plausibel]]></Text>
+			<Text LcId="1033"><![CDATA[Cylinder sensors not plausible]]></Text>
+		</Text>
+		<Text TxtId="E_CylOutputs_DisplayText">
+			<Text LcId="1031"><![CDATA[Zylinder-Ausgänge gleichzeitig angesteuert]]></Text>
+			<Text LcId="1033"><![CDATA[Cylinder outputs both set at the same time]]></Text>
+		</Text>
+		<Text TxtId="E_CylLimitSwitch_DisplayText">
+			<Text LcId="1031"><![CDATA[Zylinder Endlagenüberwachung]]></Text>
+			<Text LcId="1033"><![CDATA[Cylinder limit switch monitoring]]></Text>
+		</Text>
+		<Text TxtId="E_MotorStart_DisplayText">
+			<Text LcId="1031"><![CDATA[Motor konnte nicht gestartet werden]]></Text>
+			<Text LcId="1033"><![CDATA[Motor could not be started]]></Text>
+		</Text>
+		<Text TxtId="E_ProtSwitch_DisplayText">
+			<Text LcId="1031"><![CDATA[Motorschutzschalter ausgelöst]]></Text>
+			<Text LcId="1033"><![CDATA[Motor protection switch triggered]]></Text>
+		</Text>
+		<Text TxtId="W_ArgumentBeforeInit_DisplayText">
+			<Text LcId="1031"><![CDATA[Agrumente vor der Initialisierung gesetzt, Texte könnten fehlen]]></Text>
+			<Text LcId="1033"><![CDATA[Arguments set before initialization, texts may be missing]]></Text>
+		</Text>
+		<Text TxtId="E_StateCondition_DisplayText">
+			<Text LcId="1031"><![CDATA[Abbruch: {0}]]></Text>
+			<Text LcId="1033"><![CDATA[Abort: {0}]]></Text>
+		</Text>
+		<Text TxtId="E_SwitchCondition_DisplayText">
+			<Text LcId="1031"><![CDATA[Zeitüberschreitung: {0}]]></Text>
+			<Text LcId="1033"><![CDATA[Timeout: {0}]]></Text>
+		</Text>
+	</Translations>
+	<DataTypes>
+		<DataType>
+			<Name GUID="{E76993E3-CEB7-4D2D-8298-BB29DD058C5E}" Namespace="EventClassGeneral">EventClassGeneral</Name>
+			<DisplayName TxtId=""><![CDATA[EventClassGeneral_DisplayText]]></DisplayName>
+			<EventId>
+				<Name Id="0">W_TooManyAlarmsDefined</Name>
+				<DisplayName TxtId=""><![CDATA[W_TooManyAlarmsDefined_DisplayText]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="17">W_CyclicCallNotDetected</Name>
+				<DisplayName TxtId=""><![CDATA[W_CyclicCallNotDetected_DisplayText]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="1">E_Debug</Name>
+				<DisplayName TxtId=""><![CDATA[Debug: {0}]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="2">E_CylHomePos</Name>
+				<DisplayName TxtId=""><![CDATA[E_CylHomePos_DisplayText]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="3">E_CylWorkPos</Name>
+				<DisplayName TxtId=""><![CDATA[E_CylWorkPos_DisplayText]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="4">E_CylPair</Name>
+				<DisplayName TxtId=""><![CDATA[E_CylPair_DisplayText]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="5">E_CylOutputs</Name>
+				<DisplayName TxtId=""><![CDATA[E_CylOutputs_DisplayText]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="6">E_CylLimitSwitch</Name>
+				<DisplayName TxtId=""><![CDATA[E_CylLimitSwitch_DisplayText]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="7">E_MotorStart</Name>
+				<DisplayName TxtId=""><![CDATA[E_MotorStart_DisplayText]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="8">E_ProtSwitch</Name>
+				<DisplayName TxtId=""><![CDATA[E_ProtSwitch_DisplayText]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="10">V_Debug</Name>
+				<DisplayName TxtId=""><![CDATA[Debug: {0}]]></DisplayName>
+				<Severity>Verbose</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="11">I_Debug</Name>
+				<DisplayName TxtId=""><![CDATA[Debug: {0}]]></DisplayName>
+				<Severity>Info</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="12">W_Debug</Name>
+				<DisplayName TxtId=""><![CDATA[Debug: {0}]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="13">C_Debug</Name>
+				<DisplayName TxtId=""><![CDATA[Debug: {0}]]></DisplayName>
+				<Severity>Critical</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="14">W_ArgumentBeforeInit</Name>
+				<DisplayName TxtId=""><![CDATA[W_ArgumentBeforeInit_DisplayText]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="15">E_StateCondition</Name>
+				<DisplayName TxtId=""><![CDATA[E_StateCondition_DisplayText]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="16">E_SwitchCondition</Name>
+				<DisplayName TxtId=""><![CDATA[E_SwitchCondition_DisplayText]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<Hides>
+				<Hide GUID="{B293BEF7-9287-4DA5-99A2-6E8967365C29}"/>
+				<Hide GUID="{CC6E4084-5AE0-4AE0-8467-5D92091C8E49}"/>
+				<Hide GUID="{20342293-21F2-4EF0-A87F-62B9D415B957}"/>
+				<Hide GUID="{3C89FA0C-18B6-4FE7-B6BC-F3A5B7038587}"/>
+				<Hide GUID="{762374F0-099D-41B0-8042-B77C3899264E}"/>
+				<Hide GUID="{A335E7E3-BCB6-424A-BF98-C6FD887EDBE2}"/>
+				<Hide GUID="{1FEB5CF8-BF2F-478C-BF0D-3BD9B01E27BA}"/>
+				<Hide GUID="{F1F2F31E-2EB1-4392-B0AB-62737A142C5C}"/>
+				<Hide GUID="{D6002100-6E6A-4421-BAE0-BD7B908ADEF4}"/>
+				<Hide GUID="{E4C1C17E-3550-4A31-83DA-93CE40B6C869}"/>
+				<Hide GUID="{29B280DE-2985-4539-B557-3443A039A462}"/>
+				<Hide GUID="{AF757FD0-7B32-4C80-8FFE-581E830E4169}"/>
+				<Hide GUID="{D58C06DA-D073-4270-9BA8-7DBEEBA481DC}"/>
+				<Hide GUID="{6F165034-D4F7-4435-B4CE-0C8A12724527}"/>
+				<Hide GUID="{D6DC5675-BD6C-4AA2-9FCA-FFB36EEAC5F5}"/>
+				<Hide GUID="{D4759739-54CF-4FBF-8B6A-E6D66F758930}"/>
+				<Hide GUID="{D7EE2BC8-171F-4FA6-BAFC-310622E87D20}"/>
+				<Hide GUID="{E7D2CA0F-D878-4107-99BD-0E03E6D82D61}"/>
+				<Hide GUID="{3628D646-AFF9-41A8-A1F0-F38D418FBB21}"/>
+				<Hide GUID="{882BE87A-D361-4D86-ACC8-1A63E285F312}"/>
+				<Hide GUID="{90187D45-4C94-40D3-A213-C39F3ED0F6BB}"/>
+				<Hide GUID="{1A9AED86-1636-43C4-BB89-138E8D8A3A35}"/>
+				<Hide GUID="{FC35C113-7783-4E35-94D5-8EAA77E90B08}"/>
+				<Hide GUID="{90F90BAC-11EA-4AFA-A715-0A64785B67DA}"/>
+				<Hide GUID="{CD990F2E-F6AC-4FFD-BD44-5D325988956D}"/>
+				<Hide GUID="{F95FFA5F-6964-4783-BE9C-542B6ED61A46}"/>
+			</Hides>
+		</DataType>
+	</DataTypes>
+</TcModuleClass>

@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <DUT Name="ST_ProcessData" Id="{e2b22876-2d4b-419d-bdf0-d410ccc6aeae}">
+    <Declaration><![CDATA[TYPE ST_ProcessData :
+STRUCT
+	Pos	: ARRAY[0..Parameter.MAX_POS_INDEX] OF ST_Position;
+	Info		: ST_Task;	// info about the complete process of all positions
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

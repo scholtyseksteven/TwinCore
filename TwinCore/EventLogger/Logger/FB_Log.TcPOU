@@ -1,0 +1,264 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <POU Name="FB_Log" Id="{3c4d6f9c-8380-4c28-9487-874780a8deff}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Log
+VAR_INPUT
+	refTimeStamp	: REFERENCE TO ST_SysTime;
+END_VAR
+VAR_OUTPUT
+	xBusy		: BOOL;
+	xBufferFull	: BOOL;
+END_VAR
+VAR
+	fbFileOpen		: FB_FileOpen;
+	fbFileRead		: FB_FileRead;
+	fbFileWrite		: FB_FileWrite;
+	fbFileClose		: FB_FileClose;
+	fileHandle		: UINT;
+
+	// file variables
+	filePath		: STRING := 'debug.log';
+	nStringIndexTemp: INT;
+	nStringIndex	: INT;
+	nStringPointer	: INT;
+	sLineToWrite	: ARRAY[0..MAX_STRINGS] OF STRING( Parameter.MAX_STRING_LENGTH );
+	
+	xNewLine		: BOOL;
+	
+    stateFile	: FB_StateMachine;
+
+END_VAR
+VAR CONSTANT
+	MAX_STRINGS		: INT := 99;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[
+CASE stateFile.nState OF
+	
+	-1:	// Error
+		IF stateFile.bStateChanged THEN
+			xBusy := FALSE;
+			fbFileOpen( bExecute := FALSE );
+			fbFileRead( bExecute := FALSE );
+			fbFileWrite( bExecute := FALSE );
+			fbFileClose( bExecute := FALSE );
+			nStringIndex := 0;
+			nStringPointer := 0;
+		END_IF
+		
+		xNewLine := nStringIndex <> nStringPointer;
+		
+		stateFile.AddSwitchCondition( NOT xNewLine, '' );
+		IF stateFile.Switch( 'Error', T#0S ) THEN
+			stateFile.Reset();
+		END_IF
+	
+	0: // Initialisierung
+		stateFile.AddSwitchCondition( xNewLine, '' );
+		
+		IF stateFile.Switch( 'Init', T#0S ) THEN
+			xBusy := TRUE;
+			fbFileOpen( bExecute := FALSE );
+			fbFileRead( bExecute := FALSE );
+			fbFileWrite( bExecute := FALSE );
+			fbFileClose( bExecute := FALSE );
+			stateFile.IncrementState( 1 );
+		END_IF;
+	
+	1: // open file
+		fbFileOpen(
+			bExecute := TRUE,
+			nMode := FOPEN_MODEAPPEND,
+			sPathName := filePath,
+			hFile => fileHandle
+		);
+		
+		stateFile.AddSwitchCondition( fileHandle <> 0 OR fbFileOpen.bError, '' );
+		
+		IF stateFile.Switch( 'Open File', T#0S ) THEN
+			IF fileHandle <> 0 THEN
+				stateFile.IncrementState( 1 );
+			END_IF
+			IF fbFileOpen.bError THEN
+				stateFile.SetError();
+			END_IF
+		END_IF
+	
+	2: // Zeile an Datei anfügen
+		fbFileWrite(
+			bExecute := TRUE,
+			hFile := fileHandle,
+			pWriteBuff := ADR( sLineToWrite[nStringPointer] ),
+			cbWriteLen := INT_TO_UINT( LEN( sLineToWrite[nStringPointer] ) )
+		);
+		
+		stateFile.AddSwitchCondition( NOT fbFileWrite.bBusy OR fbFileWrite.bError, '' );
+		
+		IF stateFile.Switch( 'Write File', T#0S ) THEN
+			IF NOT fbFileWrite.bError THEN
+				sLineToWrite[nStringPointer] := '';
+				Increment( nStringPointer );
+				IF xNewLine THEN
+					stateFile.SetNextState( 2 );
+				ELSE
+					stateFile.IncrementState( 1 );
+				END_IF
+			ELSE
+				stateFile.SetError();
+			END_IF
+			fbFileWrite( bExecute := FALSE );
+		END_IF
+
+	3: // Datei schließen
+		fbFileClose(
+			bExecute := TRUE,
+			hFile := fileHandle
+		);
+		stateFile.AddSwitchCondition( NOT fbFileClose.bBusy OR fbFileClose.bError, '' );
+		IF stateFile.Switch( 'Close File', T#0S ) THEN
+			
+			fbFileOpen( bExecute := FALSE );
+			fbFileRead( bExecute := FALSE );
+			fbFileWrite( bExecute := FALSE );
+			fbFileClose( bExecute := FALSE );
+			
+			xBusy := FALSE;
+			fileHandle := 0;
+			fbFileClose.bExecute := FALSE;
+			stateFile.SetNextState( 0 );
+		END_IF
+		
+END_CASE
+]]></ST>
+    </Implementation>
+    <Folder Name="private" Id="{543da1f9-888b-4728-947d-a80261ca4304}" />
+    <Method Name="AppendStringToLine" Id="{f46b477d-3502-40d8-903f-af7db1964171}">
+      <Declaration><![CDATA[METHOD PUBLIC AppendStringToLine : BOOL	// REFRENCE TO FB_Log
+VAR_INPUT
+	sNewString	: STRING( Parameter.MAX_STRING_LENGTH );
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+sLineToWrite[nStringIndex] := CONCAT( sLineToWrite[nStringIndex], sNewString );
+//AppendStringToLine := THIS^;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Increment" Id="{883efb11-5d19-4358-b865-29d3540fd54a}" FolderPath="private\">
+      <Declaration><![CDATA[METHOD PRIVATE Increment : INT
+VAR_IN_OUT
+	nValue	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IF nValue >= MAX_STRINGS THEN
+	nValue := 0;
+ELSE
+	nValue := nValue + 1;
+END_IF
+
+xNewLine := nStringIndex <> nStringPointer;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="LogDate" Id="{f384dfda-3ac2-4c15-9e17-500cfc0a897f}">
+      <Declaration><![CDATA[METHOD PUBLIC LogDate : BOOL
+VAR_INPUT
+END_VAR
+VAR
+	nLen	: INT := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+AppendStringToLine( refTimeStamp.sDate );
+LogLineNoTime();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="LogLine" Id="{665b6db4-7d08-4f73-94a3-eac2be999d05}">
+      <Declaration><![CDATA[METHOD PUBLIC LogLine : BOOL
+VAR_INPUT
+END_VAR
+VAR
+	nLen	: INT := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IF __ISVALIDREF( refTimeStamp ) THEN
+	nLen := LEN( refTimeStamp.sTimestamp );
+END_IF
+
+IF LEN( sLineToWrite[nStringIndex] ) > ( UDINT_TO_DINT( Parameter.MAX_STRING_LENGTH ) - ( nLen + 4 ) ) THEN
+	DELETE( sLineToWrite[nStringIndex], ( nLen + 4 ), LEN( sLineToWrite[nStringIndex] ) - ( nLen + 4 - 1 ) );
+	AppendStringToLine( '>>' );
+END_IF
+
+AppendStringToLine( '$R$N' );
+
+IF __ISVALIDREF( refTimeStamp ) THEN
+	sLineToWrite[nStringIndex] := CONCAT( ' ', sLineToWrite[nStringIndex] );
+	sLineToWrite[nStringIndex] := CONCAT( refTimeStamp.sTimestamp, sLineToWrite[nStringIndex] );
+END_IF
+
+Increment( nStringIndex );
+IF sLineToWrite[nStringIndex] <> '' THEN
+	sLineToWrite[nStringIndex] := '!!! Buffer Overload !!!';
+	AppendStringToLine( '$R$N' );
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="LogLineNoTime" Id="{ad2986e3-6fd6-4f3e-8a2e-20275749e92d}">
+      <Declaration><![CDATA[METHOD PUBLIC LogLineNoTime : BOOL
+VAR_INPUT
+END_VAR
+VAR
+	nLen	: INT := 0;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IF LEN( sLineToWrite[nStringIndex] ) > ( UDINT_TO_DINT( Parameter.MAX_STRING_LENGTH ) - ( nLen + 4 ) ) THEN
+	DELETE( sLineToWrite[nStringIndex], ( nLen + 4 ), LEN( sLineToWrite[nStringIndex] ) - ( nLen + 4 - 1 ) );
+	AppendStringToLine( '>>' );
+END_IF
+
+AppendStringToLine( '$R$N' );
+
+Increment( nStringIndex );
+IF sLineToWrite[nStringIndex] <> '' THEN
+	sLineToWrite[nStringIndex] := '!!! Buffer Overload !!!';
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SetFilePath" Id="{1fdc909d-172a-45ee-a685-46545d98c374}">
+      <Declaration><![CDATA[METHOD PUBLIC SetFilePath : BOOL
+VAR_INPUT
+	sFilePath	: STRING;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+filePath := sFilePath;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Action Name="TODO" Id="{9acd2bef-ec40-4c42-b6f9-d701f4b19207}">
+      <Implementation>
+        <ST><![CDATA[(*
+
+- file size überwachen und zu große Dateien verhindern
+- Option zu neuer Datei mit Zeitstempel
+
+*)
+]]></ST>
+      </Implementation>
+    </Action>
+  </POU>
+</TcPlcObject>

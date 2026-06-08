@@ -1,0 +1,222 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <POU Name="FB_ModeControl" Id="{cb8cc0ff-0e8e-4b43-8128-da651c7687a8}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_ModeControl
+VAR_INPUT
+	bInAbort:				BOOL;
+	bInHoming:				BOOL;
+	bInHomePos:				BOOL;
+	bInClear:				BOOL;
+	bInReset:				BOOL;
+	bInStart:				BOOL;
+	bInHold:				BOOL;
+	bInStop:				BOOL;
+	bInStopCycleEnd:		BOOL;
+	bInDone:				BOOL;	// state change possible
+END_VAR
+VAR_OUTPUT
+	bOutLedStart:			BOOL;
+	bOutLedStop:			BOOL;
+	bOutLedHoming:			BOOL;
+	bOutLedStopCycleEnd:	BOOL;
+	eMode:					E_Mode;
+	bStateChanged:			BOOL;	// state has changed, TRUE for one cycle each state changing
+	bStopAtCycleEndActive:	BOOL;
+	
+END_VAR
+VAR
+	fbMode:	FB_StateMachine;
+	nMode:	E_Mode;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[
+	CASE fbMode.nState OF
+
+		E_Mode.Idle:
+		
+			fbMode.addStateCondition( bCondition := TRUE, sName:= 'Always TRUE' );
+			
+			IF fbMode.bStateValid THEN
+				;
+			END_IF
+			
+			fbMode.addSwitchCondition( bCondition:= bInDone, sName:= 'not busy' );
+		
+			IF fbMode.switchWithDelay( sName:= 'Idle', tTimeout:= T#0S, tDelayTime := T#5s ) THEN
+				fbMode.setNextState( E_Mode.Stopped );
+			END_IF
+
+		E_Mode.Homing:
+		
+			fbMode.addStateCondition( bCondition := TRUE, sName:= 'Always TRUE' );
+			
+			IF fbMode.bStateChanged THEN
+				;
+			END_IF
+			
+			fbMode.addSwitchCondition( bCondition:= bInDone, sName:= 'not busy' );
+		
+			IF fbMode.switch( sName:= 'Homing', tTimeout:= T#0S ) THEN
+				fbMode.setNextState( E_Mode.Starting );
+			END_IF
+
+		E_Mode.Starting:
+		
+			fbMode.addStateCondition( bCondition := TRUE, sName:= 'Always TRUE' );
+			
+			IF fbMode.bStateChanged THEN
+				;
+			END_IF
+			
+			fbMode.addSwitchCondition( bCondition:= bInDone, sName:= 'not busy' );
+		
+			IF fbMode.switch( sName:= 'Starting', tTimeout:= T#0S ) THEN
+				fbMode.setNextState( E_Mode.Execute );
+			END_IF
+
+		E_Mode.Hold:
+		
+			fbMode.addStateCondition( bCondition := TRUE, sName:= 'Always TRUE' );
+			
+			IF fbMode.bStateChanged THEN
+				;
+			END_IF
+			
+			fbMode.addSwitchCondition( bCondition:= bInDone, sName:= 'not busy' );
+		
+			IF fbMode.switch( sName:= 'Execute', tTimeout:= T#0S ) THEN
+				IF bInStart THEN	fbMode.setNextState( E_Mode.Execute ); END_IF
+			END_IF
+
+		E_Mode.Standby:
+		
+			fbMode.addStateCondition( bCondition := TRUE, sName:= 'Always TRUE' );
+			
+			IF fbMode.bStateChanged THEN
+				;
+			END_IF
+			
+			fbMode.addSwitchCondition( bCondition:= bInStart OR bInStop, sName:= 'Start oder Stop' );
+		
+			IF fbMode.switch( sName:= 'Execute', tTimeout:= T#0S ) THEN
+				IF bInStart THEN	fbMode.setNextState( E_Mode.Execute ); END_IF
+				IF bInStop THEN	fbMode.setNextState( E_Mode.Stopping ); END_IF
+				bInStart := bInStop := FALSE;
+			END_IF
+
+		E_Mode.Execute:
+		
+			fbMode.addStateCondition( bCondition := TRUE, sName:= 'Always TRUE' );
+			
+			IF fbMode.bStateChanged THEN
+				;
+			END_IF
+			
+			fbMode.addSwitchCondition( bCondition:= bInDone, sName:= 'not busy' );
+		
+			IF fbMode.switchWithDelay( sName:= 'Execute', tTimeout:= T#0S, tDelayTime := T#5S ) THEN
+				fbMode.setNextState( E_Mode.Standby );
+			END_IF
+			IF bInHold THEN	fbMode.setNextState( E_Mode.Hold ); END_IF
+
+		E_Mode.Stopping:
+		
+			fbMode.addStateCondition( bCondition := TRUE, sName:= 'Always TRUE' );
+			
+			IF fbMode.bStateChanged THEN
+				;
+			END_IF
+			
+			fbMode.addSwitchCondition( bCondition:= bInDone, sName:= 'not busy' );
+		
+			IF fbMode.switch( sName:= 'Stopping', tTimeout:= T#0S ) THEN
+				fbMode.setNextState( E_Mode.Stopped );
+			END_IF
+
+		E_Mode.Stopped:
+		
+			fbMode.addStateCondition( bCondition := TRUE, sName:= 'Always TRUE' );
+			
+			IF fbMode.bStateChanged THEN
+				;
+			END_IF
+			
+			fbMode.addSwitchCondition( bCondition:= bInStart OR bInHoming OR bInClear, sName:= 'Clear, Home or Start' );
+			fbMode.addSwitchCondition( bCondition:= bInDone, sName:= 'not busy' );
+		
+			IF fbMode.switch( sName:= 'Stopped', tTimeout:= T#0S ) THEN
+				IF bInStart THEN	fbMode.setNextState( E_Mode.Starting ); END_IF
+				IF bInHoming THEN	fbMode.setNextState( E_Mode.Homing ); END_IF
+				IF bInClear THEN	fbMode.setNextState( E_Mode.Clearing ); END_IF
+			END_IF
+
+		E_Mode.Aborting:
+		
+			fbMode.addStateCondition( bCondition := TRUE, sName:= 'Always TRUE' );
+			
+			IF fbMode.bStateChanged THEN
+				;
+			END_IF
+			
+			fbMode.addSwitchCondition( bCondition:= bInDone, sName:= 'not busy' );
+		
+			IF fbMode.switch( sName:= 'Aborting', tTimeout:= T#0S ) THEN
+				fbMode.setNextState( E_Mode.Starting );
+			END_IF
+
+		E_Mode.Aborted:
+			
+			IF fbMode.bStateChanged THEN
+				;
+			END_IF
+			
+			fbMode.addSwitchCondition( bCondition:= bInClear, sName:= 'Acknowledge Error' );
+			fbMode.addSwitchCondition( bCondition:= bInDone, sName:= 'not busy' );
+		
+			IF fbMode.switch( sName:= 'Aborted', tTimeout:= T#0S ) THEN
+				fbMode.setNextState( E_Mode.Clearing );
+			END_IF
+
+		E_Mode.Clearing:
+			
+			IF fbMode.bStateChanged THEN
+				;
+			END_IF
+			
+			fbMode.addSwitchCondition( bCondition:= bInDone, sName:= 'not busy' );
+		
+			IF fbMode.switch( sName:= 'Clearing', tTimeout:= T#0S ) THEN
+				fbMode.setNextState( E_Mode.Stopped );
+			END_IF
+
+		E_Mode.Resetting:
+		
+			fbMode.addStateCondition( bCondition := TRUE, sName:= 'Always TRUE' );
+			
+			IF fbMode.bStateChanged THEN
+				;
+			END_IF
+			
+			fbMode.addSwitchCondition( bCondition:= bInDone, sName:= 'not busy' );
+		
+			IF fbMode.switch( sName:= 'Resetting', tTimeout:= T#0S ) THEN
+				fbMode.setNextState( E_Mode.Starting );
+			END_IF
+			
+		E_Mode.Error:
+		
+			fbMode.setNextState( E_Mode.Aborted );
+			
+	END_CASE
+	
+	eMode := fbMode.nState;
+	bStateChanged := fbMode.bStateChanged;
+	
+	// Lamps
+	bOutLedStart := fbMode.nState = E_Mode.Execute;
+	bOutLedStop := fbMode.nState = E_Mode.Stopped;
+	bOutLedHoming := bInHomePos;]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

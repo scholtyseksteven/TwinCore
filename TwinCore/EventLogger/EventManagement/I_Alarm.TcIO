@@ -1,0 +1,47 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <Itf Name="I_Alarm" Id="{8e76e599-22a0-4481-9636-6c66392ed652}">
+    <Declaration><![CDATA[INTERFACE I_Alarm EXTENDS I_Message
+]]></Declaration>
+    <Method Name="Ack" Id="{ea1a8abb-437f-4ad3-84a2-835df252c849}">
+      <Declaration><![CDATA[METHOD Ack : HRESULT
+VAR_INPUT
+END_VAR
+]]></Declaration>
+    </Method>
+    <Property Name="bActive" Id="{f1218952-ad73-42f4-9fab-ecc0bcd4d3b4}">
+      <Declaration><![CDATA[PROPERTY bActive : BOOL]]></Declaration>
+      <Get Name="Get" Id="{fd0e6dac-b3b5-47f7-a819-1c63305d1b10}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+    </Property>
+    <Property Name="bBlockAck" Id="{490af041-213c-4b95-92f3-a2fcf66a0f8b}">
+      <Declaration><![CDATA[PROPERTY PUBLIC bBlockAck : BOOL]]></Declaration>
+      <Get Name="Get" Id="{8d0ef450-9223-4def-ad3c-e656eeaa00d0}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+      <Set Name="Set" Id="{cd61d4d6-e75f-4719-958d-bd8b35d8d331}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Set>
+    </Property>
+    <Property Name="bRaised" Id="{285168cf-c035-463a-94bb-b5afd7b86968}">
+      <Declaration><![CDATA[PROPERTY bRaised : BOOL]]></Declaration>
+      <Get Name="Get" Id="{dc54a929-cb22-476c-9f24-ee22ef6aef81}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+    </Property>
+    <Property Name="eEventReaction" Id="{e63c8541-42a9-4da8-8a7e-bfc7732546c9}">
+      <Declaration><![CDATA[PROPERTY PUBLIC eEventReaction : E_AlarmReaction]]></Declaration>
+      <Get Name="Get" Id="{3d053e87-8a37-4042-9952-4605ed774b8f}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+    </Property>
+    <Method Name="UpdateText" Id="{98a28c7f-2114-414b-a2aa-9fda16a6e173}">
+      <Declaration><![CDATA[METHOD PUBLIC UpdateText : HRESULT
+VAR_INPUT
+	LangId	: INT;
+END_VAR
+]]></Declaration>
+    </Method>
+  </Itf>
+</TcPlcObject>

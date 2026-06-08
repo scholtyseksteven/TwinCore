@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <DUT Name="ST_EventEntryTable" Id="{183b392d-1f36-4143-8efb-435b33d73427}">
+    <Declaration><![CDATA[TYPE ST_EventEntryTable EXTENDS ST_LogEntry :
+STRUCT
+	nSourceId			: UDINT;
+	nZoneId				: UDINT;
+	nGroupId			: UDINT;
+	sDescription		: T_MaxString;
+	eSeverity			: TcEventSeverity;
+	eReaction			: E_AlarmReaction;
+    sReaction			: STRING( 24 );
+	EventClass			: GUID;
+	EventClassName		: T_MaxString;
+	sTimestamp			: STRING( 24 );
+	sTimestampConfirmed	: STRING( 24 );
+	sTimestampCleared	: STRING( 24 );
+	nEventId			: UDINT;
+	eConfirmationState	: TcEventConfirmationState;
+	bTextRecieved		: BOOL;
+	bIsAlarm			: BOOL;
+	bIsEvent			: BOOL;
+    stAlarmLog			: ST_AlarmLog;
+    bLogged				: BOOL;
+    nLanguageId			: INT;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

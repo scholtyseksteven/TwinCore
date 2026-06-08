@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <DUT Name="ST_Position" Id="{cef079cc-fefe-4859-8cc7-98abaeb542ea}">
+    <Declaration><![CDATA[TYPE ST_Position :
+STRUCT
+	Task		: ARRAY[0..Parameter.MAX_TASK_INDEX] OF ST_Task;
+	Group		: ARRAY[0..Parameter.MAX_GROUP_INDEX] OF ST_Task;
+	Info		: ST_Task;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <FileVersion>1.0.0.0</FileVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{413de18b-bdf1-4e39-990f-790d1f39f4f0}</ProjectGuid>
+    <SubObjectsSortedByName>True</SubObjectsSortedByName>
+    <DownloadApplicationInfo>true</DownloadApplicationInfo>
+    <WriteProductVersion>true</WriteProductVersion>
+    <GenerateTpy>false</GenerateTpy>
+    <Name>TwinCore</Name>
+    <ProgramVersion>3.1.4026.22</ProgramVersion>
+    <Application>{8336ffb8-f948-4674-b082-1b625f6d47a8}</Application>
+    <TypeSystem>{f63e8f7d-6071-49af-8890-196cb2b6a7a8}</TypeSystem>
+    <Implicit_Task_Info>{5fe37b28-00d7-4100-97d0-613c702a1988}</Implicit_Task_Info>
+    <Implicit_KindOfTask>{d480680d-dee7-4dfd-9978-ea7e113f6db0}</Implicit_KindOfTask>
+    <Implicit_Jitter_Distribution>{07a8677a-d570-424e-b62a-34b5dfcc15af}</Implicit_Jitter_Distribution>
+    <LibraryReferences>{7e090ec1-5622-4a9a-914c-781607e40872}</LibraryReferences>
+    <Company>TwinCore</Company>
+    <Released>true</Released>
+    <Title>TwinCore</Title>
+    <ProjectVersion>2026.24.1.0</ProjectVersion>
+    <DefaultNamespace>TwinCore</DefaultNamespace>
+    <Placeholder>TwinCore.</Placeholder>
+    <Author>TwinCore</Author>
+    <Description>base implementations, utilities, TC3 event logging, state machines, ...</Description>
+    <GlobalVersionStructureIncluded>true</GlobalVersionStructureIncluded>
+    <POUsForPropertyAccessIncluded>true</POUsForPropertyAccessIncluded>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="EventLogger\EventListenerExtV2\DUTs\E_AlarmMessage.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\EventListenerExtV2\DUTs\ST_AlarmInfo.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\EventListenerExtV2\DUTs\ST_AlarmLog.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\EventListenerExtV2\DUTs\ST_EventEntryTableListener.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\EventListenerExtV2\FB_EventListenerExtV2.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\EventListenerExtV2\I_EventListener.TcIO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\EventManagement\DUTs\E_AlarmReaction.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\EventManagement\DUTs\ST_EventEntryTable.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\EventManagement\DUTs\ST_EventHmiControl.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\EventManagement\FB_Alarm.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\EventManagement\FB_AlarmDelayed.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\EventManagement\FB_AlarmManagement.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\EventManagement\FB_Message.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\EventManagement\I_Alarm.TcIO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\EventManagement\I_Message.TcIO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\Logger\E_RollingInterval.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\Logger\FB_FileRetentionTimeHandler.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\Logger\FB_GenerateTimeData.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\Logger\FB_Log.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\Logger\FB_LogFile.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\Logger\FB_LogStringBuffer.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\Logger\FB_SystemTimeService.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\Logger\F_GetFileAgeInSeconds.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="EventLogger\Logger\ST_LogEntry.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="General\Blinker\FB_Blinker.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="General\Blinker\FB_Blinker_PWM.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="General\CONCAT\FB_CONCAT.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="General\CONCAT\FB_CONCAT_STRINGS.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="General\CONCAT\I_CONCAT.TcIO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="General\FB_AnalogInputFilter.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="General\FB_Signal.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="GVLs\GVL_Diag.TcGVL">
+      <SubType>Code</SubType>
+      <LinkAlways>true</LinkAlways>
+    </Compile>
+    <Compile Include="GVLs\GVL_GLOBAL.TcGVL">
+      <SubType>Code</SubType>
+      <LinkAlways>true</LinkAlways>
+    </Compile>
+    <Compile Include="Lists\FB_ListNumbers_DINT.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Lists\FB_ListNumbers_REAL.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Lists\FB_ListString.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Misc\ST_LinCoord_XY.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Misc\ST_LinCoord_XYZ.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Misc\ST_SysTime.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Parameter.TcGVL">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Process\DUTs\ST_Position.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Process\DUTs\ST_ProcessData.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Process\DUTs\ST_Task.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Process\FB_Process.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Project Information\F_GetCompany.TcPOU">
+      <SubType>Code</SubType>
+      <SystemCall>true</SystemCall>
+    </Compile>
+    <Compile Include="Project Information\F_GetTitle.TcPOU">
+      <SubType>Code</SubType>
+      <SystemCall>true</SystemCall>
+    </Compile>
+    <Compile Include="Project Information\F_GetVersion.TcPOU">
+      <SubType>Code</SubType>
+      <SystemCall>true</SystemCall>
+    </Compile>
+    <Compile Include="StateMachine\FB_StateMachine.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="StateMachine\MachineState\E_MachineState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="StateMachine\MachineState\FB_MachineState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="StateMachine\MachineState\ST_MachineInfo.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="StateMachine\ModeControl\E_Mode.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="StateMachine\ModeControl\FB_ModeControl.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="StateMachine\ST_HMI_Condition.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="StateMachine\ST_HMI_StateMachine.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="StateMachine\ST_StateMachine_State.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Version\Global_Version.TcGVL">
+      <SubType>Code</SubType>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="EventLogger" />
+    <Folder Include="EventLogger\EventListenerExtV2" />
+    <Folder Include="EventLogger\EventListenerExtV2\DUTs" />
+    <Folder Include="EventLogger\EventManagement" />
+    <Folder Include="EventLogger\EventManagement\DUTs" />
+    <Folder Include="EventLogger\Logger" />
+    <Folder Include="General\CONCAT" />
+    <Folder Include="General\Blinker" />
+    <Folder Include="GVLs" />
+    <Folder Include="General" />
+    <Folder Include="Misc" />
+    <Folder Include="Lists" />
+    <Folder Include="Process" />
+    <Folder Include="Process\DUTs" />
+    <Folder Include="Process\Functions" />
+    <Folder Include="Process\Helper" />
+    <Folder Include="Project Information" />
+    <Folder Include="StateMachine" />
+    <Folder Include="StateMachine\MachineState" />
+    <Folder Include="StateMachine\ModeControl" />
+    <Folder Include="Version" />
+  </ItemGroup>
+  <ItemGroup>
+    <PlaceholderReference Include="Tc2_Standard">
+      <DefaultResolution>Tc2_Standard, * (Beckhoff Automation GmbH)</DefaultResolution>
+      <Namespace>Tc2_Standard</Namespace>
+    </PlaceholderReference>
+    <PlaceholderReference Include="Tc2_System">
+      <DefaultResolution>Tc2_System, * (Beckhoff Automation GmbH)</DefaultResolution>
+      <Namespace>Tc2_System</Namespace>
+    </PlaceholderReference>
+    <PlaceholderReference Include="Tc2_Utilities">
+      <DefaultResolution>Tc2_Utilities, * (Beckhoff Automation GmbH)</DefaultResolution>
+      <Namespace>Tc2_Utilities</Namespace>
+    </PlaceholderReference>
+    <PlaceholderReference Include="Tc3_EventLogger">
+      <DefaultResolution>Tc3_EventLogger, * (Beckhoff Automation GmbH)</DefaultResolution>
+      <Namespace>Tc3_EventLogger</Namespace>
+    </PlaceholderReference>
+    <PlaceholderReference Include="Tc3_Module">
+      <DefaultResolution>Tc3_Module, * (Beckhoff Automation GmbH)</DefaultResolution>
+      <Namespace>Tc3_Module</Namespace>
+    </PlaceholderReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ExternalTypes.tmc">
+      <SubType>Content</SubType>
+    </None>
+  </ItemGroup>
+  <ProjectExtensions>
+    <PlcProjectOptions>
+      <XmlArchive>
+  <Data>
+    <o xml:space="preserve" t="OptionKey">
+      <v n="Name">"&lt;ProjectRoot&gt;"</v>
+      <d n="SubKeys" t="Hashtable" ckt="String" cvt="OptionKey">
+        <v>{192FAD59-8248-4824-A8DE-9177C94C195A}</v>
+        <o>
+          <v n="Name">"{192FAD59-8248-4824-A8DE-9177C94C195A}"</v>
+          <d n="SubKeys" t="Hashtable" />
+          <d n="Values" t="Hashtable" />
+        </o>
+        <v>{29BD8D0C-3586-4548-BB48-497B9A01693F}</v>
+        <o>
+          <v n="Name">"{29BD8D0C-3586-4548-BB48-497B9A01693F}"</v>
+          <d n="SubKeys" t="Hashtable" ckt="String" cvt="OptionKey">
+            <v>NamingConventions</v>
+            <o>
+              <v n="Name">"NamingConventions"</v>
+              <d n="SubKeys" t="Hashtable" />
+              <d n="Values" t="Hashtable" />
+            </o>
+            <v>Rules</v>
+            <o>
+              <v n="Name">"Rules"</v>
+              <d n="SubKeys" t="Hashtable" />
+              <d n="Values" t="Hashtable" />
+            </o>
+          </d>
+          <d n="Values" t="Hashtable" />
+        </o>
+        <v>{40450F57-0AA3-4216-96F3-5444ECB29763}</v>
+        <o>
+          <v n="Name">"{40450F57-0AA3-4216-96F3-5444ECB29763}"</v>
+          <d n="SubKeys" t="Hashtable" />
+          <d n="Values" t="Hashtable" />
+        </o>
+        <v>{8A0FB252-96EB-4DCC-A5B4-B4804D05E2D6}</v>
+        <o>
+          <v n="Name">"{8A0FB252-96EB-4DCC-A5B4-B4804D05E2D6}"</v>
+          <d n="SubKeys" t="Hashtable" />
+          <d n="Values" t="Hashtable" ckt="String" cvt="Boolean">
+            <v>WriteLineIDs</v>
+            <v>True</v>
+          </d>
+        </o>
+        <v>{8F99A816-E488-41E4-9FA3-846536012284}</v>
+        <o>
+          <v n="Name">"{8F99A816-E488-41E4-9FA3-846536012284}"</v>
+          <d n="SubKeys" t="Hashtable" />
+          <d n="Values" t="Hashtable" ckt="String" cvt="String">
+            <v>DisabledWarningIds</v>
+            <v>410,5410</v>
+          </d>
+        </o>
+        <v>{eeeeeeee-3909-4298-8022-501ac3238667}</v>
+        <o>
+          <v n="Name">"{eeeeeeee-3909-4298-8022-501ac3238667}"</v>
+          <d n="SubKeys" t="Hashtable" />
+          <d n="Values" t="Hashtable" />
+        </o>
+        <v>{F66C7017-BDD8-4114-926C-81D6D687E35F}</v>
+        <o>
+          <v n="Name">"{F66C7017-BDD8-4114-926C-81D6D687E35F}"</v>
+          <d n="SubKeys" t="Hashtable" />
+          <d n="Values" t="Hashtable" ckt="String" cvt="Boolean">
+            <v>CalcActiveTransOnly</v>
+            <v>True</v>
+          </d>
+        </o>
+      </d>
+      <d n="Values" t="Hashtable" />
+    </o>
+  </Data>
+  <TypeList>
+    <Type n="Boolean">System.Boolean</Type>
+    <Type n="Hashtable">System.Collections.Hashtable</Type>
+    <Type n="OptionKey">{54dd0eac-a6d8-46f2-8c27-2f43c7e49861}</Type>
+    <Type n="String">System.String</Type>
+  </TypeList>
+</XmlArchive>
+    </PlcProjectOptions>
+  </ProjectExtensions>
+</Project>

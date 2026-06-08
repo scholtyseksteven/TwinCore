@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <DUT Name="ST_AlarmInfo" Id="{3c3cf634-489d-4987-bbac-beceeca6771c}">
+    <Declaration><![CDATA[TYPE ST_AlarmInfo :
+STRUCT
+	bVerbose: BOOL;
+	nVerboseRaisedCount: UDINT;
+	bInfo: BOOL;
+	nInfoRaisedCount: UDINT; 
+	bWarning: BOOL;
+	nWarningRaisedCount: UDINT;
+	bError: BOOL;
+	nErrorRaisedCount: UDINT;
+	bCritical: BOOL;
+	nCriticalRaisedCount: UDINT;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

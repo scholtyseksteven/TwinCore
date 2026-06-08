@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<TcSmProject xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.beckhoff.com/schemas/2012/07/TcSmProject" TcSmVersion="1.0" TcVersion="3.1.4026.22">
+	<Project ProjectGUID="{EE400B02-1C1B-48CC-9F66-1785E1EFE1E1}" ShowHideConfigurations="#x6">
+		<System>
+			<TypeSystem>
+				<AdditionalTmcFile Name="EventClassGeneral" File="Events\EventClassGeneral.tmc"/>
+			</TypeSystem>
+		</System>
+		<Plc>
+			<Project GUID="{413DE18B-BDF1-4E39-990F-790D1F39F4F0}" Name="TwinCore" PrjFilePath="TwinCore\TwinCore.plcproj" TmcFilePath="TwinCore\TwinCore.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e"/>
+		</Plc>
+	</Project>
+</TcSmProject>

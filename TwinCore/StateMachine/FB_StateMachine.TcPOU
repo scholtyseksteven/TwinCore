@@ -1,0 +1,405 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <POU Name="FB_StateMachine" Id="{20777a20-7db8-4b94-a438-40a9045784ec}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_StateMachine
+VAR_INPUT
+	bTimeoutActive	: BOOL := TRUE;
+	bStepMode		: BOOL := FALSE;
+	bNextStep		: BOOL := FALSE;
+	nStateForced	: INT := -1;
+	hmiData			: REFERENCE TO ST_HMI_StateMachine;
+	refLogger		: REFERENCE TO FB_Log;
+END_VAR
+VAR_OUTPUT
+	bError			: BOOL;	// Error if state conditions are not TRUE or Timeout during to missing switch conditions.
+	nErrorState		: INT := ERROR_STATE;	// the last state before error occured
+	bSwitch			: BOOL;	// all switch conditions are TRUE
+	bStateChanged	: BOOL;	// state has changed, TRUE for one cycle each state changing
+	bStateValid		: BOOL;	// state conditions are true
+	nState			: INT;	// current state, error = -1
+	sState			: STRING;
+	sTimeout		: STRING;
+	tTimeInActState	: LTIME;	// Time in actual state
+END_VAR
+VAR
+
+	//stStateHistory	: ARRAY[0..Settings.HISTORY_SIZE] OF ST_StateMachine_State;
+	//better without struct, because of better debugging online view
+	anStateHistory	: ARRAY[0..Parameter.HISTORY_SIZE] OF INT;
+	asStateHistory	: ARRAY[0..Parameter.HISTORY_SIZE] OF STRING;
+	
+	tnTimeout		: TON;
+	tnDelay			: TON;
+	
+	i					: INT;
+	iState				: INT;
+	iSwitch				: INT;
+	iSwitchOrSection	: INT;
+	
+	nSwitchIndex		: INT;
+	nStateIndex			: INT;
+	
+	abSwitchCondition	: ARRAY[0..Parameter.NUM_CON] OF BOOL;
+	abStateCondition	: ARRAY[0..Parameter.NUM_CON] OF BOOL;
+	asSwitchCondition	: ARRAY[0..Parameter.NUM_CON] OF T_MaxString;
+	asStateCondition	: ARRAY[0..Parameter.NUM_CON] OF T_MaxString;
+	
+	nSwitchOrSection	: INT;	// 0 - global, 1..NUM_CON section
+	anSwitchConSection	: ARRAY[0..Parameter.NUM_CON] OF INT;
+	anOrSectionNextState	: ARRAY[0..Parameter.NUM_CON] OF INT;
+	nOrSectionNextState	: INT;
+	bOrSectionNextState	: BOOL;	// Oder-Sektion vorhanden
+	bSwitchOr			: BOOL;
+	
+	bPreventErrorOverwrite	: BOOL;
+	
+	{attribute 'instance-path'}
+	{attribute 'noinit'}
+	instancePath: STRING;
+	instanceName: STRING;	
+
+	fbErrState		: FB_Alarm( TC_EVENTS.EventClassGeneral.E_StateCondition );
+	fbErrSwitch		: FB_Alarm( TC_EVENTS.EventClassGeneral.E_SwitchCondition );
+	
+END_VAR
+VAR CONSTANT
+	NUM_CON		: USINT := 15;
+	ERROR_STATE	: INT := -1;	// ErrorState in Case of state conditions are not TRUE or switch timeout
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="private" Id="{d283932f-13d3-4da6-9d31-f83aad769a13}" />
+    <Method Name="AddEntryCondition" Id="{50f19e92-c082-4f20-8b7d-c8968fde9204}">
+      <Declaration><![CDATA[METHOD PUBLIC AddEntryCondition : BOOL
+VAR_INPUT
+	bCondition:	BOOL;
+	sName:		STRING;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="AddStateCondition" Id="{2a160c6e-e581-4d4c-95f6-1dd0d9c7d47b}">
+      <Declaration><![CDATA[METHOD PUBLIC AddStateCondition : BOOL
+VAR_INPUT
+	bCondition:	BOOL;
+	sName:		STRING;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+bStateValid R= NOT bCondition;
+
+IF iState <= NUM_CON THEN
+	abStateCondition[iState] := bCondition;
+	asStateCondition[iState] := sName;
+	iState := iState + 1;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="AddSwitchCondition" Id="{44009035-2545-4e39-ad3c-47bb5de34eda}">
+      <Declaration><![CDATA[METHOD PUBLIC AddSwitchCondition : BOOL
+VAR_INPUT
+	bCondition:	BOOL;
+	sName:		STRING;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+bSwitch R= NOT bCondition OR NOT bStateValid;
+
+IF iSwitch <= NUM_CON THEN
+	abSwitchCondition[iState] := bCondition;
+	asSwitchCondition[iSwitch] := sName;
+	iSwitch := iSwitch + 1;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_Init" Id="{19d51a4d-27ee-4563-9f02-6e54edb56801}" FolderPath="private\">
+      <Declaration><![CDATA[//FB_Init is always available implicitly and it is used primarily for initialization.
+//The return value is not evaluated. For a specific influence, you can also declare the
+//methods explicitly and provide additional code there with the standard initialization
+//code. You can evaluate the return value.
+METHOD FB_Init: BOOL
+VAR_INPUT
+    bInitRetains: BOOL; // TRUE: the retain variables are initialized (reset warm / reset cold)
+    bInCopyCode: BOOL;  // TRUE: the instance will be copied to the copy code afterward (online change)   
+END_VAR
+VAR
+	_i	: INT;
+	_posDot	: INT;
+	_instanceName: STRING;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+_instanceName := instancePath;
+FOR _i := 0 TO 9 DO
+	_posDot := FIND( _instanceName, '.' );
+	IF _posDot = 0 THEN
+		EXIT;
+	END_IF
+	_instanceName := DELETE( _instanceName, _posDot, 1 );
+END_FOR
+SetInstanceName := _instanceName;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FillRestOfConditions" Id="{8e82084f-d722-49f1-b7c3-4b61e1ec8ed4}" FolderPath="private\">
+      <Declaration><![CDATA[METHOD PRIVATE FillRestOfConditions : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+// fill bits and empty strings in rest of state arrays
+IF nStateIndex < Parameter.NUM_CON THEN
+	FOR i := nStateIndex TO Parameter.NUM_CON DO
+		abStateCondition[i] := TRUE;
+	END_FOR
+	MemSet( ADR( asStateCondition[nStateIndex] ), 0, SIZEOF( asStateCondition[0] ) * TO_UINT( Parameter.NUM_CON - nStateIndex + 1 ) );
+END_IF
+
+// fill bits and empty strings in rest of switch arrays
+IF nSwitchIndex < Parameter.NUM_CON THEN
+	FOR i := nSwitchIndex TO Parameter.NUM_CON DO
+		abSwitchCondition[i] := TRUE;
+		anSwitchConSection[i] := -1;
+	END_FOR
+	MemSet( ADR( asSwitchCondition[nSwitchIndex] ), 0, SIZEOF( asSwitchCondition[0] ) * TO_UINT( Parameter.NUM_CON - nSwitchIndex + 1 ) );
+END_IF
+
+// reset hmi data if available
+IF __ISVALIDREF( hmiData ) THEN
+	
+	// fill bits and empty strings in rest of state arrays
+	IF nStateIndex < Parameter.NUM_CON THEN
+		FOR i := nStateIndex TO Parameter.NUM_CON DO
+			hmiData.stStateCondition[i].xState := TRUE;
+			hmiData.stStateCondition[i].sName := '';
+		END_FOR
+	END_IF
+	
+	// fill bits and empty strings in rest of switch arrays
+	IF nSwitchIndex < Parameter.NUM_CON THEN
+		FOR i := nSwitchIndex TO Parameter.NUM_CON DO
+			hmiData.stSwitchCondition[i].xState := TRUE;
+			hmiData.stSwitchCondition[i].sName := '';
+		END_FOR
+	END_IF
+	
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="IncrementState" Id="{337897eb-3ca1-4d00-91eb-d32200312fc0}">
+      <Declaration><![CDATA[METHOD PUBLIC IncrementState : BOOL
+VAR_INPUT
+	nStateOffset:	INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+SetNextState( nState + nStateOffset );
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Reset" Id="{283b8150-3f5b-454c-b36e-0fc486f08e88}">
+      <Declaration><![CDATA[METHOD PUBLIC Reset : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SaveStateHistory" Id="{49d456ad-fdb6-4c9c-a38f-d3da18b2c566}" FolderPath="private\">
+      <Declaration><![CDATA[METHOD PRIVATE SaveStateHistory : BOOL
+VAR_INPUT
+	nState:	INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IF __ISVALIDREF(refLogger) THEN
+	refLogger.AppendStringToLine( instanceName );
+	refLogger.AppendStringToLine( ' - [' );
+	refLogger.AppendStringToLine( INT_TO_STRING( nState ) );
+	refLogger.AppendStringToLine( '] - ' );
+	refLogger.AppendStringToLine( sState );
+	refLogger.LogLine();
+END_IF
+
+FOR i := Parameter.HISTORY_SIZE-1 TO 0 BY -1 DO
+	anStateHistory[i+1] := anStateHistory[i];
+	asStateHistory[i+1] := asStateHistory[i];
+	IF __ISVALIDREF( hmiData ) THEN
+		hmiData.stStateHistory[i+1].nState := anStateHistory[i];
+		hmiData.stStateHistory[i+1].sState := asStateHistory[i];
+	END_IF
+END_FOR
+
+anStateHistory[0] := nState;
+asStateHistory[0] := '';
+IF __ISVALIDREF( hmiData ) THEN
+	hmiData.stStateHistory[0].nState := nState;
+	hmiData.stStateHistory[0].sState := '';
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SetError" Id="{5c8cf8bf-8dc0-415b-aac1-956e5896e2f5}">
+      <Declaration><![CDATA[METHOD PUBLIC SetError : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+bError := TRUE;
+IF nState <> ERROR_STATE THEN
+	bPreventErrorOverwrite := TRUE;
+	nErrorState := nState;
+	SetNextState( ERROR_STATE );
+	sState := 'Error';
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="SetInstanceName" Id="{b5241190-4963-400c-b1e4-8e898e422fb9}">
+      <Declaration><![CDATA[PROPERTY PUBLIC SetInstanceName : STRING]]></Declaration>
+      <Set Name="Set" Id="{851b3a53-4447-4ae0-884d-4749ff03f3f9}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[instanceName := SetInstanceName;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="SetNextState" Id="{718e8668-8bd6-46b6-a39f-28979a7bf025}">
+      <Declaration><![CDATA[METHOD PUBLIC SetNextState : BOOL
+VAR_INPUT
+	nNextState:	INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+nState := nNextState;
+bStateChanged := TRUE;
+
+// Reset validation data
+bStateValid := TRUE;
+
+saveStateHistory( nNextState );
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Switch" Id="{a1e942ca-0033-480d-b83e-1be51df806f8}">
+      <Declaration><![CDATA[METHOD PUBLIC Switch : BOOL
+VAR_INPUT
+	sName		: STRING;
+	tTimeout	: TIME;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+// timeout monitoring
+IF tTimeout <> T#0S THEN
+	tnTimeout(
+		IN := NOT bSwitch,
+		PT := tTimeout
+	);
+	sTimeout := TIME_TO_STRING( tnTimeout.ET );
+	IF tnTimeout.Q THEN
+		fbErrSwitch.setEventWithOneArgument( TRUE, sName );
+		setNextState( -1 );	// error
+		bError := TRUE;
+	END_IF
+ELSE
+	tnTimeout( IN := FALSE );
+	sTimeout := TIME_TO_STRING( tTimeout );
+END_IF
+
+// state monitoring
+IF NOT bStateValid THEN
+	fbErrState.setEventWithOneArgument( TRUE, sName );
+	setNextState( -1 );	// error
+	bError := TRUE;
+END_IF
+
+switch := bSwitch;
+
+sState := sName;
+
+IF bStateChanged THEN
+	
+	// fill bits and empty strings in rest of state arrays
+	IF iState < NUM_CON THEN
+		FOR i := iState TO NUM_CON DO
+			abStateCondition[i] := TRUE;
+		END_FOR
+		MEMSET( ADR( asStateCondition[iState] ), 0, SIZEOF( asStateCondition[0] ) * TO_UINT( NUM_CON - iState + 1 ) );
+	END_IF
+	
+	// fill bits and empty strings in rest of switch arrays
+	IF iSwitch < NUM_CON THEN
+		FOR i := iState TO NUM_CON DO
+			abSwitchCondition[i] := TRUE;
+		END_FOR
+		MEMSET( ADR( asSwitchCondition[iSwitch] ), 0, SIZEOF( asSwitchCondition[0] ) * TO_UINT( NUM_CON - iSwitch + 1 ) );
+	END_IF
+	
+END_IF
+
+// reset i's
+iState := 0;
+iSwitch := 0;
+
+// reset switch info for next cycle
+bSwitch := TRUE;
+bStateValid := TRUE;
+
+// switch is only one cycle active, reset switch info
+bStateChanged := FALSE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SwitchWithDelay" Id="{aa046871-3081-49c1-a087-46e6ae585e8e}">
+      <Declaration><![CDATA[METHOD PUBLIC SwitchWithDelay : BOOL
+VAR_INPUT
+	sName:	STRING;
+	tTimeout:	TIME;
+	tDelayTime:	TIME;	// state is active at least this time, after all switch conditions are TRUE
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// timeout monitoring
+IF tDelayTime <> T#0S THEN
+	tnDelay(
+		IN := bSwitch,
+		PT := tDelayTime
+	);
+	IF NOT tnDelay.Q THEN
+		bSwitch := FALSE;
+	END_IF
+ELSE
+	tnDelay( IN := FALSE );
+END_IF
+
+IF tTimeout <> T#0S THEN
+	tTimeout := tTimeout + tDelayTime;
+END_IF
+
+switchWithDelay := switch( sName := sName, tTimeout := tTimeout ) ;
+
+IF switchWithDelay THEN
+	tnDelay( IN := FALSE );
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

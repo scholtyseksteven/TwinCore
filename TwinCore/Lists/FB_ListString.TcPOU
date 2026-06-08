@@ -1,0 +1,84 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <POU Name="FB_ListString" Id="{bd4c7694-608d-4826-a99a-8bf4f1eb78cd}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_ListString
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+	asList	: ARRAY[0..MAX_INDEX] OF STRING;
+END_VAR
+VAR CONSTANT
+	MAX_INDEX	: INT := 9;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[
+// FIFO]]></ST>
+    </Implementation>
+    <Method Name="addEntry" Id="{91c1d7c7-509d-493d-80ac-3487cf502d84}">
+      <Declaration><![CDATA[METHOD addEntry : BOOL
+VAR_INPUT
+	entry	: STRING;
+END_VAR
+VAR
+	i	: INT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+FOR i := 0 TO MAX_INDEX DO
+	IF asList[i] = '' THEN
+		EXIT;
+	END_IF
+END_FOR
+asList[i] := entry;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="clear" Id="{9bfa52b7-5859-4429-b425-94fa111d7d90}">
+      <Declaration><![CDATA[METHOD PUBLIC clear : BOOL
+VAR_INPUT
+END_VAR
+VAR
+	i	: INT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+FOR i := 0 TO MAX_INDEX DO
+	asList[i] := '';
+END_FOR
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="isEmpty" Id="{ac83f3d1-9d95-4cf6-b54a-8c5eb70f58fd}">
+      <Declaration><![CDATA[METHOD PUBLIC isEmpty : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+isEmpty := asList[0] = '';
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="popEntry" Id="{23c967e6-b739-4837-82a3-6c6b819d1543}">
+      <Declaration><![CDATA[METHOD PUBLIC popEntry : STRING
+VAR_INPUT
+END_VAR
+VAR
+	i	: INT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+// return element
+popEntry := asList[0];
+
+// shift elements in array
+FOR i := 0 TO MAX_INDEX - 1 DO
+	asList[i] := asList[i + 1];
+END_FOR
+asList[MAX_INDEX] := '';
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

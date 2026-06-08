@@ -1,0 +1,141 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <POU Name="FB_FileRetentionTimeHandler" Id="{256f5983-f294-4e23-a4e1-fedf355786c7}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_FileRetentionTimeHandler
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+    _expirationInDays : UINT; // 	Files will be deleted if older than n days
+    _filePath         : T_MAXSTRING; //	Path to files to be deleted
+    _fileName         : T_MAXSTRING; //	Only files which match this filename will be deleted
+    _timeProvider     : REFERENCE TO FB_GenerateTimeData;
+    _actualTime       : T_FILETIME; // 	Actual Time
+    _actualSysTime    : TIMESTRUCT;
+
+    fbEnum              : FB_EnumFindFileList;
+    bRunSearch          : BOOL;
+    fbDeleteFile        : FB_FileDelete;
+    fTrigDeleteFileBusy : F_TRIG;
+    _state              : UINT := 0;
+    filesList           : ARRAY[0..MAX_FILES_COUNT - 1] OF ST_FindFileEntry;
+    deleteFileIndex     : UDINT;
+    deleteFileName      : T_MAXSTRING;
+    eEnumCmd            : E_EnumCmdType;
+    _LastDay            : TIMESTRUCT;
+    _sSearchPath        : T_MaxString;
+    bRemoveFile         : BOOL;
+END_VAR
+VAR CONSTANT
+    GetFilesState      : UINT := 0;
+    RemoveFilesState   : UINT := 1;
+    MAX_FILES_COUNT    : INT := 100;
+    ONE_DAY_IN_SECONDS : LREAL := 24 * 3600.0;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="private" Id="{2e11b132-edcd-4583-9be6-31ede09da148}" />
+    <Method Name="Configure" Id="{b5713c07-7f0c-495e-958c-075ea9fa63b3}">
+      <Declaration><![CDATA[METHOD Configure : BOOL
+VAR_INPUT
+    expirationInDays : UINT; // 	Files will be deleted if older than n days
+    filePath         : T_MAXSTRING; //	Path to files to be deleted
+    fileName         : T_MAXSTRING; //	Only files which match this filename will be deleted
+    timeProvider     : REFERENCE TO FB_GenerateTimeData;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+_expirationInDays := expirationInDays;
+_filePath := filePath;
+_fileName := fileName;
+_timeProvider REF= timeProvider;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HandleFiles" Id="{6cb1fab3-5677-458f-99ef-c37411ca5455}">
+      <Declaration><![CDATA[METHOD HandleFiles : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IF NOT _timeProvider.IsValid THEN
+    // We cannot work without valid time data
+    RETURN;
+END_IF
+
+_timeProvider( timeAsSystemTime => _actualSysTime, timeAsFileTime => _actualTime );
+
+IF _LastDay.wDay = _actualSysTime.wDay
+AND _LastDay.wMonth = _actualSysTime.wMonth
+AND _LastDay.wYear = _actualSysTime.wYear THEN
+    // Still same day, nothing to do
+    RETURN;
+END_IF
+
+CASE _state OF
+	GetFilesState:
+		HandleFileSearch();
+	RemoveFilesState:
+		HandleRemoveCommands();
+END_CASE
+
+// Search files in given directory
+fbEnum(
+	sNetId := '',
+	eCmd := eEnumCmd,
+	sPathName := _sSearchPath,
+	bExecute := bRunSearch,
+	pFindList := ADR( filesList ),
+	cbFindList := SIZEOF( filesList ),
+	tTimeout := T#10S
+);
+
+// Delete files
+fbDeleteFile( sNetId := '', sPathName := deleteFileName, bExecute := bRemoveFile, tTimeout := T#10S );
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HandleFileSearch" Id="{7c964608-5f31-4971-a70e-6e9b1f86ba20}" FolderPath="private\">
+      <Declaration><![CDATA[METHOD PRIVATE HandleFileSearch : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bRemoveFile := FALSE;
+eEnumCmd := eEnumCmd_First;
+deleteFileIndex := 0;
+_sSearchPath := CONCAT(_filePath, CONCAT('*', _fileName));
+
+IF bRunSearch AND NOT fbEnum.bBusy AND NOT fbEnum.bError AND fbEnum.nFindFiles > 0 THEN
+    // end search and remove files
+    // set abort command if EoE reached otherwise not necessary
+    eEnumCmd := SEL(fbEnum.bEOE, eEnumCmd_Abort, eEnumCmd_First);
+    _state := RemoveFilesState;
+ELSIF bRunSearch AND NOT fbEnum.bBusy AND fbEnum.nFindFiles = 0 THEN
+    // Nothing has been found, wait for next day
+    _LastDay := _actualSysTime;
+    bRunSearch := FALSE;
+ELSIF bRunSearch AND fbEnum.bError THEN
+    // if error restart search
+    bRunSearch := FALSE;
+ELSE
+    // start search
+    bRunSearch := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HandleRemoveCommands" Id="{854e3b80-0aa8-4856-9009-edde3de9f0bb}" FolderPath="private\">
+      <Declaration><![CDATA[METHOD PRIVATE HandleRemoveCommands : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

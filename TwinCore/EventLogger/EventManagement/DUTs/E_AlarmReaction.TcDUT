@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <DUT Name="E_AlarmReaction" Id="{41380db4-e1e9-492a-b7e8-9f5937444989}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'strict'}
+TYPE E_AlarmReaction :
+(
+	None := 0,
+	Info,
+	Warning,
+	Verbose,
+	StopAtCycleEnd,
+	AbortGroup,
+	AbortAll,
+	MediaOff
+);
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

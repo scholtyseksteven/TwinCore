@@ -1,0 +1,418 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <POU Name="FB_LogFile" Id="{a2ed8d5b-e730-4b65-9359-d4ba364be5f3}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_LogFile
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+	aiLogEntry	: ARRAY[0..MAX_INDEX] OF I_Message;
+	astLogEntry	: ARRAY[0..MAX_INDEX] OF ST_LogEntry;
+	indexNew	: UINT := 0;
+	index		: UINT := 0;
+	
+	stLogEntry	: ST_LogEntry;
+	
+    _logCache   : FB_LogStringBuffer; // Dynamic string buffer to cache logs to be processed
+    fbFileRetentionTimeHandler : FB_FileRetentionTimeHandler;
+    _bOverflow	: BOOL;
+    DebugString	: STRING( Parameter.MAX_LOG_STRING_SIZE );
+    lastLogTimeAsStruct	: TIMESTRUCT;
+    fbFileOpen  : FB_FileOpen;
+    fbFileWrite : FB_FileWrite;
+	
+	fbState		: FB_StateMachine;
+	
+	// config
+    _fileName	: T_MaxString := '';
+    _CfgFileName	: T_MaxString := 'log'; // Base file name
+    _filePath	: T_MaxString := 'C:\Logs\'; // Path to folder 
+    _RollingInterval	: E_RollingInterval := E_RollingInterval.Daily; // Interval when to start a new file
+	_delimiter	: STRING( 3 ) := ' | ';
+    _LogFileLifespan	: UINT := 30; // Lifespan of logfiles in days. Once exceeded, log files will be deleted.
+    _TimestampFormat	: STRING := 'YYYYMMDD_hhmm'; // Format the timestamp should have
+	
+	// time and date
+    _TimeData	: FB_GenerateTimeData;
+    timeAsFileTime   : T_FILETIME; // Actual time as filetime, corrected to local time zone
+    lastTimeCallTime : LINT;
+    timeAsSystemTime : TIMESTRUCT; // Actual time as timestring
+    timeAsString : STRING; // Actual time as string
+	
+    _timeStamp : STRING( 255 );
+	
+    bInit	: BOOL;
+END_VAR
+VAR CONSTANT
+	MAX_INDEX	: UINT := 9999;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[GetTime();
+
+// run logger
+IF NOT bInit THEN
+	fbFileRetentionTimeHandler.Configure( _LogFileLifespan, _filePath, _fileName, _TimeData );
+	bInit := TRUE;
+END_IF
+
+// Generate new timestamp for filename
+IF RollingIntervalReached( lastlogTimeAsStruct, _RollingInterval ) OR _TimeData.Done THEN
+	_timeStamp := _TimeData.ToString( _TimestampFormat );
+	_filePath := SEL( RIGHT( _filePath, 1 ) <> '\', _filePath, CONCAT( _filePath, '\' ) );
+	
+	fbConcat.SetDstString( _fileName )
+		.AddString( _filePath )
+		.AddString( _timeStamp )
+		.AddStringInput( '.' )
+		.AddString( _CfgFileName ).Get();
+
+END_IF
+
+// Delete expired log files
+fbFileRetentionTimeHandler.HandleFiles();
+
+IF _TimeData.IsValid AND _filename <> '' THEN
+	// Persist logging messages to file
+	PersistToFile( _filename );
+END_IF
+
+// automatic detection of new entries
+CASE fbState.nState OF
+
+	0:	// wait for new entries
+		IF index <> indexNew THEN
+			fbState.IncrementState( 1 );
+		END_IF
+	
+	1:	// check entry, trigger eventlogger if necessary
+		stLogEntry.sText := '';
+		
+		// log entry from TC EventClass
+		IF aiLogEntry[index] <> 0 THEN
+			IF aiLogEntry[index].GetEventText() THEN
+				stLogEntry := aiLogEntry[index].LogEntry;
+			END_IF
+			
+		// log from structure
+		ELSIF astLogEntry[index].sText <> '' THEN
+			stLogEntry := astLogEntry[index];
+		END_IF
+		
+		// text available, next step
+		IF stLogEntry.sText <> '' THEN
+			LogData(
+				Message := stLogEntry.sText,
+				Source := stLogEntry.sSourceName,
+				Severity := stLogEntry.sSeverity,
+				timeAsString := stLogEntry.sTimestampLog
+			);
+			IF index < MAX_INDEX THEN
+				index := index + 1;
+			ELSE
+				index := 0;
+			END_IF
+			
+			fbState.IncrementState( 1 );
+		END_IF
+	
+	2:	// wait log data done
+		fbState.SetNextState( 0 );
+		
+END_CASE
+]]></ST>
+    </Implementation>
+    <Method Name="addEntry" Id="{a83a91d5-3ce3-4ba8-a455-8a252544c431}">
+      <Declaration><![CDATA[METHOD addEntry : BOOL
+VAR_INPUT
+	entry	: I_Message;
+END_VAR
+VAR
+	i	: INT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+addEntry := TRUE;
+
+// add entry interface at current index, no shifting of array.
+aiLogEntry[indexNew] := entry;
+
+IF indexNew >= MAX_INDEX
+AND_THEN index <> 0 THEN
+	indexNew := 0;
+ELSIF ( indexNew + 1 ) <> index THEN
+	indexNew := indexNew + 1;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="addLog" Id="{eef02506-28ea-44a0-8044-055ddc96d566}">
+      <Declaration><![CDATA[METHOD addLog : BOOL
+VAR_INPUT
+	entry	: STRING;
+END_VAR
+VAR
+	i	: INT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+addLog := TRUE;
+
+{warning 'TODO: timestamp withing Logger, also convenient way to get source info and severity'}
+astLogEntry[indexNew].sText := entry;
+astLogEntry[indexNew].sSeverity := 'manually';
+
+IF indexNew >= MAX_INDEX
+AND_THEN index <> 0 THEN
+	indexNew := 0;
+ELSIF ( indexNew + 1 ) <> index THEN
+	indexNew := indexNew + 1;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="GetTime" Id="{f8321da5-cc04-4fa3-853f-d521838448b2}">
+      <Declaration><![CDATA[{attribute 'hide'}
+METHOD GetTime : BOOL
+VAR_INPUT
+END_VAR
+VAR
+    nTaskIdx            : DINT;
+    currentTimeCallTime : LINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+nTaskIdx := GETCURTASKINDEXEX();
+
+IF nTaskIdx > 0 THEN
+	currentTimeCallTime := TwinCAT_SystemInfoVarList._TaskInfo[nTaskIdx].DcTaskTime;
+	
+	IF lastTimeCallTime = currentTimeCallTime THEN
+		RETURN; // Only call once per cycle
+	END_IF
+	
+	// Generate time data (shared state)
+	fbSystemTime();
+	_TimeData(
+		timeAsFileTime => timeAsFileTime,
+		timeAsSystemTime => timeAsSystemTime,
+		timeAsString => timeAsString
+	);
+	lastTimeCallTime := currentTimeCallTime;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="LogData" Id="{a3d13025-8886-4eab-9d60-aee750809fff}">
+      <Declaration><![CDATA[{attribute 'hide'}
+METHOD LogData : BOOL
+VAR_IN_OUT CONSTANT
+    Message			: STRING( Parameter.MAX_LOG_STRING_SIZE ); // Message to log.
+    Source			: T_MaxString;	// source info of logEntry
+    Severity		: STRING;
+    timeAsString	: STRING;		// timestamp as string
+END_VAR
+VAR
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IF _bOverflow AND _logCache.IsEmpty THEN
+    _bOverflow := FALSE;
+END_IF
+
+IF NOT _bOverflow THEN
+
+    IF _fileName <> '' THEN
+        fbConcat.SetDstString( DebugString )
+            .AddStringInput( timeAsString )
+            .AddString( _delimiter )
+            .AddStringInput( Severity )
+            .AddString( _delimiter )
+            .AddStringInput( Source )
+            .AddString( _delimiter )
+            .AddStringInput( Message );
+
+        IF NOT _LogCache.AddLine( DebugString ) THEN
+            _bOverflow := TRUE;
+        END_IF
+		
+    END_IF
+	
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="PersistToFile" Id="{7164825d-e13a-469a-b8a1-701c267cfbc5}">
+      <Declaration><![CDATA[{attribute 'hide'}
+METHOD PersistToFile : BOOL
+VAR_INPUT
+    FileName : T_MAXSTRING; //	File name including its path
+END_VAR
+VAR_INST
+    state : UINT;
+
+    fbFileOpen      : FB_FileOpen;
+    fTrigFileOpened : F_TRIG;
+    hFile           : UINT;
+
+    fbFilePuts        : FB_FileWrite;
+    fTrigFilePuts     : F_TRIG;
+    newLogEntry       : STRING( Parameter.MAX_LOG_STRING_SIZE * Parameter.MAX_BUFFER_COUNT );
+    filePutsTriggered : BOOL;
+
+    fbFileClose    : FB_FileClose;
+    fTrigFileClose : F_TRIG;
+    tonTimeout     : TON;
+    bDebug         : BOOL;
+END_VAR
+VAR CONSTANT
+    STATE_IDLE                 : UINT := 0;
+    STATE_OPEN_FILE            : UINT := 1;
+    STATE_GET_STRING_FROM_FIFO : UINT := 2;
+    STATE_APPEND_DATA_TO_FILE  : UINT := 3;
+    STATE_CLOSE_FILE           : UINT := 4;
+
+    NET_ID  : STRING := '';
+    TIMEOUT : TIME := T#20S;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+// State machine
+CASE state OF
+	STATE_IDLE:
+		IF NOT _logCache.IsEmpty THEN
+			filePutsTriggered := FALSE;
+			state := STATE_OPEN_FILE;
+		END_IF
+	
+	STATE_OPEN_FILE:
+		IF fTrigFileOpened.Q THEN
+			state := STATE_GET_STRING_FROM_FIFO;
+		END_IF
+	
+	STATE_GET_STRING_FROM_FIFO:
+		MEMSET( ADR( newLogEntry ), 0, SIZEOF( newLogEntry ) );
+	
+		IF NOT filePutsTriggered THEN
+			_logCache.PopHead( resultString := newLogEntry );
+			state := STATE_APPEND_DATA_TO_FILE;
+		END_IF
+	
+		filePutsTriggered := FALSE;
+	
+	STATE_APPEND_DATA_TO_FILE:
+		filePutsTriggered := TRUE;
+	
+		IF fTrigFilePuts.Q THEN
+			IF NOT _logCache.IsEmpty AND NOT tonTimeout.Q THEN
+				state := STATE_GET_STRING_FROM_FIFO;
+			ELSE
+				state := STATE_CLOSE_FILE;
+			END_IF
+		END_IF
+	
+	STATE_CLOSE_FILE:
+		IF fTrigFileClose.Q THEN
+			state := STATE_IDLE;
+		END_IF
+
+END_CASE
+
+// Function blocks used in state machine
+fbFileOpen(
+	sNetId := NET_ID,
+	sPathName := FileName,
+	nMode := FOPEN_MODEAPPEND OR FOPEN_MODETEXT,
+	ePath := PATH_GENERIC,
+	bExecute := ( state = STATE_OPEN_FILE ),
+	tTimeout := TIMEOUT,
+	hFile => hFile
+);
+
+fTrigFileOpened( CLK := fbFileOpen.bBusy );
+
+fbFilePuts(
+	sNetId := NET_ID,
+	hFile := hFile,
+	pWriteBuff := ADR( newLogEntry ),
+	cbWriteLen := LEN2( ADR( newLogEntry ) ),
+	bExecute := ( state = STATE_APPEND_DATA_TO_FILE ),
+	tTimeout := TIMEOUT
+);
+
+fTrigFilePuts( CLK := fbFilePuts.bBusy );
+
+fbFileClose(
+	sNetId := NET_ID,
+	hFile := hFile,
+	bExecute := ( state = STATE_CLOSE_FILE ),
+	tTimeout := TIMEOUT
+);
+
+fTrigFileClose( CLK := fbFileClose.bBusy );
+
+//IF tonTimeout.Q AND NOT bDebug THEN
+//    state := STATE_IDLE;
+//END_IF
+// Timeout writing to file => close file
+tonTimeout( IN := state <> STATE_IDLE, PT := TIMEOUT );
+
+// Error handling
+//IF fbFileOpen.bError THEN
+//    Error.Active := TRUE;
+//    Error.Code := E_ErrorCode.OpeningFileFailed;
+//    Error.Info := CONCAT('Opening file failed. Error thrown by FB_FileOpen. Consult Beckhoff InfoSys. Internal Error: ', UDINT_TO_STRING(fbFileOpen.nErrId));
+//ELSIF fbFilePuts.bError THEN
+//    Error.Active := TRUE;
+//    Error.Code := E_ErrorCode.WritingToFileFailed;
+//    Error.Info :=
+//        CONCAT('Writing to file failed. Error thrown by FB_FilePuts. Consult Beckhoff InfoSys. Internal Error: ', UDINT_TO_STRING(fbFilePuts.nErrId));
+//ELSIF fbFileClose.bError THEN
+//    Error.Active := TRUE;
+//    Error.Code := E_ErrorCode.ClosingFileFailed;
+//    Error.Info := CONCAT('Closing file failed. Error thrown by FB_FileClose. Consult Beckhoff InfoSys. Internal Error: ', UDINT_TO_STRING(fbFileClose.nErrId));
+//ELSIF NOT Fifo.bOk AND Fifo.nCount > 0 THEN
+//    Error.Active := TRUE;
+//    Error.Code := E_ErrorCode.FifoOverflow;
+//    Error.Info := 'FIFO overflow. Check if (a) plc has enough free memory and (b) if no message is written each plc cycle';
+//ELSE
+//    Error.Active := FALSE;
+//    Error.Code := E_ErrorCode.None;
+//    Error.Info := '';
+//END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RollingIntervalReached" Id="{6f6d40e9-3a00-4e25-9be2-9054aca00a81}">
+      <Declaration><![CDATA[// Checks the specified rolling interval for the file name.
+// Generates new file name if rolling intervall exceeded.
+{attribute 'hide'}
+METHOD PRIVATE RollingIntervalReached : BOOL
+VAR_INPUT
+    actualTime      : TIMESTRUCT;
+    rollingInterval : E_RollingInterval;
+END_VAR
+VAR_INST
+    lastTime : TIMESTRUCT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IF actualTime.wYear > lastTime.wYear OR actualTime.wMonth > lastTime.wMonth THEN
+    // new year or month is also new hour and new day
+    RollingIntervalReached := TRUE;
+ELSIF actualTime.wDay > lastTime.wDay THEN
+    // new day is also new hour
+    RollingIntervalReached := rollingInterval = E_RollingInterval.Hourly OR rollingInterval = E_RollingInterval.Daily;
+ELSIF actualTime.wHour > lastTime.wHour THEN
+    // new hour only holds for hourly
+    RollingIntervalReached := rollingInterval = E_RollingInterval.Hourly;
+END_IF
+
+// save actual log time as last time
+MEMCPY( ADR( lastTime ), ADR( actualTime ), SIZEOF( actualTime ) );
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

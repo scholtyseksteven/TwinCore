@@ -1,0 +1,54 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <POU Name="FB_Signal" Id="{ca5e9833-d668-4649-b207-b6b71796880d}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Signal
+VAR_INPUT
+	IN	: BOOL;	// state of signal
+	PT_on	: TIME := T#200MS;
+	PT_off	: TIME := T#200MS;
+END_VAR
+VAR_OUTPUT
+	Q	: BOOL;	// effective value of signal
+	Q_Stored	: BOOL;	// stored value of signal, reset manually with method
+	RT	: BOOL;	// rising edge
+	FT	: BOOL;	// falling edge
+END_VAR
+VAR
+	tmpIN	: BOOL;
+	
+	tonOnDebounce	: TON;
+	tofOffDebounce	: TOF;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[
+// call timer to debounce signal
+tonOnDebounce( IN := IN, PT := PT_on );
+tofOffDebounce( IN := tonOnDebounce.Q, PT := PT_off );
+
+// edges and representation of values
+RT := NOT tmpIN AND IN;
+FT := tmpIN AND NOT IN;
+Q := tofOffDebounce.Q;
+Q_stored S= Q;
+
+// store IN internally to avoid using R_TRIG and F_TRIG
+tmpIN := IN;
+]]></ST>
+    </Implementation>
+    <Method Name="ResetQS" Id="{6b70ddea-8b81-452d-b1a7-0f385a5a002c}">
+      <Declaration><![CDATA[METHOD PUBLIC ResetQS : BOOL
+VAR_INPUT
+	reset	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IF reset THEN
+	Q_stored := Q;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

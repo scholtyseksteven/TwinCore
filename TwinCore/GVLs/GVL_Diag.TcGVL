@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <GVL Name="GVL_Diag" Id="{7bf02ed6-ce4b-4a1a-a562-eb7ee03f0ff7}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+VAR_GLOBAL
+	gfbAlarmManagement			: FB_AlarmManagement;	// should be before gipEvent and gnCountEvents, because of init order!
+	gfbLogFile					: FB_LogFile;
+	gfbEventListener			: FB_EventListenerExtV2; // other HMI than TE2000
+	gipAlarm					: ARRAY[0..Parameter.nMaxNumberAlarms] OF I_Alarm;
+	gnCountAlarms				: UINT := 3;	// 0..2 defined within FB_EventManagement
+	gbCountAlarmsMaxExceeded	: BOOL := FALSE;
+	gbInterfaceNotAssigned		: BOOL := FALSE;
+	
+END_VAR
+]]></Declaration>
+  </GVL>
+</TcPlcObject>

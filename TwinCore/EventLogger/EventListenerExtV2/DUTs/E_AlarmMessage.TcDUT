@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <DUT Name="E_AlarmMessage" Id="{5b79872a-80e6-4428-ab53-8b587619a6b2}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'strict'}
+TYPE E_AlarmMessage :
+(
+	RequestText := 0,
+    ReceiveText := 1,
+    Insert := 2,
+    WriteDB := 3,
+    Done := 4
+);
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

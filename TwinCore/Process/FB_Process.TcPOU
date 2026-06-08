@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <POU Name="FB_Process" Id="{bb5ee958-f67c-4cba-83f0-9318dcb22e1d}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Process
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="Checks" Id="{1f14c9d6-8828-4d43-b654-d10b5d075b28}" />
+    <Folder Name="Init" Id="{e2d86233-3121-4406-9192-7834abbd5f65}" />
+    <Folder Name="Setter" Id="{66d2f237-8c7e-4569-9d6a-90397994886b}" />
+  </POU>
+</TcPlcObject>

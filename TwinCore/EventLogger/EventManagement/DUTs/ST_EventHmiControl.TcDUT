@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <DUT Name="ST_EventHmiControl" Id="{db9a39da-6fd4-4a29-b385-e98644c5336f}">
+    <Declaration><![CDATA[TYPE ST_EventHmiControl :
+STRUCT
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

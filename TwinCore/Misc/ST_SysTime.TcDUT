@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <DUT Name="ST_SysTime" Id="{81005f16-bbe5-4a1f-8d85-357b90ba2271}">
+    <Declaration><![CDATA[TYPE ST_SysTime :
+STRUCT
+	uliDateTime	: ULINT := 0;
+	sTimestamp	: STRING(12); // current time, format: hh:mm:ss:ms
+	sDate		: STRING(10); // current date, format example: dd.mm.yyyy
+	uiYear		: UINT := 0;
+	uiMonth		: UINT := 9999;
+	uiDay		: UINT := 9999;
+	uiHour		: UINT := 9999;
+	uiMinute	: UINT := 9999;
+	uiSecond	: UINT := 9999;
+	uiMillis	: UINT := 9999;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

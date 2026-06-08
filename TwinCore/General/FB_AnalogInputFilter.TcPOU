@@ -1,0 +1,67 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <POU Name="FB_AnalogInputFilter" Id="{3b64030d-6082-4144-b9af-e5aaaa2fe77d}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_AnalogInputFilter
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+	rVal:			LREAL := 0.0;	// Ausgangssignal
+END_VAR
+VAR
+	rFactor:		LREAL;	// factor for filter
+	rOldVal:		LREAL;	// old value to compare and calculate with
+	bFirstCycle:	BOOL := TRUE;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="FB_init" Id="{2bf8c07c-e7b8-4007-a65d-f5dc92812e69}">
+      <Declaration><![CDATA[METHOD FB_init : BOOL
+VAR_INPUT
+	bInitRetains : BOOL; // if TRUE, the retain variables are initialized (warm start / cold start)
+	bInCopyCode : BOOL;  // if TRUE, the instance afterwards gets moved into the copy code (online change)
+	
+	rCycles		: REAL := 0.0;		// Anzahl Werte/Zyklen, über die 99% des Sollwerts erreicht werden soll.
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+// Faktor für die Gewichtung zwischen aktuellem und gespeicherten Wert
+// 0.01, da 1-0.99 wegen 99% als Ziel
+rFactor := 1 - LREAL_TO_REAL( EXPT(0.01, 1.0/rCycles) );
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Value" Id="{bb42d755-2ede-462f-99ee-97dac20b0565}">
+      <Declaration><![CDATA[PROPERTY PUBLIC Value : LREAL]]></Declaration>
+      <Get Name="Get" Id="{6c86b172-2a46-464a-97f3-b02775421c19}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[
+Value := rVal;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{f8f7bda9-4300-44c8-8ba6-c76a1a9f6337}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[
+// set value directly at first cycle to prevent startup ramp
+IF bFirstCycle THEN
+	rOldVal := Value;
+	bFirstCycle := FALSE;
+END_IF;
+
+// filter value PT
+rVal := (1 - rFactor) * rOldVal + rFactor * Value;
+rOldVal := rVal;
+]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+  </POU>
+</TcPlcObject>

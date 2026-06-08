@@ -1,0 +1,42 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <Itf Name="I_EventListener" Id="{e85a0abd-f00f-4dde-8c4b-05fe27c261fe}">
+    <Declaration><![CDATA[INTERFACE I_EventListener EXTENDS __SYSTEM.IQueryInterface
+]]></Declaration>
+    <Method Name="DeleteEventsFromTable" Id="{f4ad1455-777b-43df-8777-06b4a1a838ca}">
+      <Declaration><![CDATA[METHOD PUBLIC DeleteEventsFromTable : BOOL]]></Declaration>
+    </Method>
+    <Method Name="GetEventByIndex" Id="{550ee501-5228-4320-a720-cbff88aacfe5}">
+      <Declaration><![CDATA[METHOD GetEventByIndex : HRESULT
+    VAR_OUTPUT
+        sTimestamp: STRING(80); // 
+        sTimestampConfirmed: STRING(80);
+        sTimestampCleared: STRING(80);
+        sText: STRING(255); //
+        sSourceName: STRING(255); //
+        EventClassName: STRING(255); //
+        eConfirmationState : BYTE;
+        eSeverity :  BYTE; // INT
+    END_VAR
+VAR_INPUT
+    nIndex : UDINT;
+END_VAR]]></Declaration>
+    </Method>
+    <Property Name="LangId" Id="{3c7b9813-e84f-44df-91e8-ff121b7afacd}">
+      <Declaration><![CDATA[PROPERTY PUBLIC LangId : INT]]></Declaration>
+      <Get Name="Get" Id="{587b0ea1-0556-4aca-a254-5dceed974f90}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+      <Set Name="Set" Id="{4bca48ca-6ce5-4b45-8332-1d0fadfe0061}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Set>
+    </Property>
+    <Property Name="NumberActiveEvents" Id="{972d3641-ba80-40e0-9f85-12ebede25bd2}">
+      <Declaration><![CDATA[PROPERTY NumberActiveEvents : UDINT
+]]></Declaration>
+      <Get Name="Get" Id="{b1eb9bf1-d2d0-4371-8c4f-ae4b9ef19fc8}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+    </Property>
+  </Itf>
+</TcPlcObject>

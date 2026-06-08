@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <DUT Name="ST_MachineInfo" Id="{bbbfb233-5773-412a-b03f-03f5bd6849e8}">
+    <Declaration><![CDATA[TYPE ST_MachineInfo :
+STRUCT
+	bInInitDone:	BOOL;
+	bInMediaOn:		BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <POU Name="FB_Blinker" Id="{49a6b240-56d5-4996-a552-bdaaba7c96c1}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Blinker
+VAR_INPUT
+	EN	: BOOL;	// enable
+	PT	: TIME := T#500MS;
+END_VAR
+VAR_OUTPUT
+	Q	: BOOL;
+	Flash	: BOOL;	// flashes each rising edge of Q
+END_VAR
+VAR
+	_tonBlink	: TON;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

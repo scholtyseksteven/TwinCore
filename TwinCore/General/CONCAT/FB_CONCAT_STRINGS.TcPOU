@@ -1,0 +1,65 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <POU Name="FB_CONCAT_STRINGS" Id="{83ecf117-b90e-4979-8755-a357770f5ee3}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK PUBLIC FB_CONCAT_STRINGS IMPLEMENTS I_CONCAT
+VAR_INPUT
+    {attribute 'hide'}
+	_pDstString	: POINTER TO STRING;
+    {attribute 'hide'}
+	_nDstSize	: UDINT;
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="AddString" Id="{8f94949c-c0cd-49ca-ad9f-c1e13d3adb7c}">
+      <Declaration><![CDATA[// using a function like ADR() for input parameter gives no further recommendations in smart coding
+METHOD PUBLIC AddString : I_CONCAT	// using a function like ADR() for input parameter gives no further recommendations in smart coding
+VAR_INPUT
+	pSrcString	: ANY_STRING;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CONCAT2(
+	pSrcString1 := _pDstString,
+	pSrcString2 := pSrcString.pValue,
+	pDstString := _pDstString,
+	nDstSize := _nDstSize
+);
+addString := THIS^;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="AddStringInput" Id="{41a4fee3-ef3c-411e-b6ab-ccee14024db0}">
+      <Declaration><![CDATA[// Append text to the current build string.
+METHOD PUBLIC AddStringInput : I_CONCAT
+// comment below
+VAR_INPUT
+	in:	STRING;	// comment var
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+// comment implementation
+addString( in );
+addStringInput := THIS^;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Get" Id="{aea0f665-d313-4663-a47d-a417d4325174}">
+      <Declaration><![CDATA[METHOD PUBLIC Get : T_MAXSTRING
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+Get := _pDstString^;
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

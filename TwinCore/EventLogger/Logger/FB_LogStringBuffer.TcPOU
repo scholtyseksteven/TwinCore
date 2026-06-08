@@ -1,0 +1,181 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <POU Name="FB_LogStringBuffer" Id="{f4cd33b2-a8d1-4e08-8c03-d05a03a6f945}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_LogStringBuffer
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+    fbFifoBuffer : FB_MemRingBuffer; // Necessary to buffer log data until it has been written to file.
+    asBuffer     : ARRAY[0..STRING_BUFFER_SIZE] OF BYTE; // Buffer of string
+    headString   : STRING( Parameter.MAX_LOG_STRING_SIZE + 1 );
+    nHeadLen     : UDINT;
+    ConcatText   : STRING( Parameter.MAX_LOG_STRING_SIZE + 1 );
+    newline      : STRING( 1 ) := '$N';
+END_VAR
+VAR CONSTANT
+    BUFFER_OVERHEAD    : UDINT := 10;
+    STRING_BUFFER_SIZE : UDINT := ( Parameter.MAX_LOG_STRING_SIZE + BUFFER_OVERHEAD ) * Parameter.MAX_BUFFER_COUNT;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="AddLine" Id="{a686a716-1bc5-48e2-a29b-756ee0926f33}">
+      <Declaration><![CDATA[METHOD AddLine : BOOL
+VAR_IN_OUT 
+    Text : STRING( Parameter.MAX_LOG_STRING_SIZE );
+END_VAR
+VAR
+    pText : POINTER TO BYTE;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+pText := ADR( Text );
+CONCAT2( pText, ADR( newline ), ADR( ConcatText ), SIZEOF( ConcatText ) );
+
+fbFifoBuffer.A_AddTail(
+	pWrite := ADR( ConcatText ),
+	cbWrite := LEN2( ADR( ConcatText ) )
+);
+
+AddLine := fbFifoBuffer.bOk;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="AddString" Id="{b4ed6f0e-1989-4325-911b-f48b1bba34e7}">
+      <Declaration><![CDATA[METHOD AddString : BOOL
+VAR_INPUT
+    Text : STRING( Parameter.MAX_LOG_STRING_SIZE );
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+fbFifoBuffer.A_AddTail(
+	pWrite := ADR( Text ),
+	cbWrite := LEN2( ADR( Text ) )
+);
+AddString := fbFifoBuffer.bOk;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="AllocateBuffer" Id="{746d6fa7-b0da-44e2-bc18-6252b3059ce7}">
+      <Declaration><![CDATA[METHOD PRIVATE AllocateBuffer : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+fbFifoBuffer.pBuffer := ADR( asBuffer );
+fbFifoBuffer.cbBuffer := SIZEOF( asBuffer );
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_init" Id="{bf7961db-8b92-4cdf-a82f-d12805dfd4d2}">
+      <Declaration><![CDATA[METHOD FB_init : BOOL
+VAR_INPUT
+	bInitRetains : BOOL; // if TRUE, the retain variables are initialized (warm start / cold start)
+	bInCopyCode : BOOL;  // if TRUE, the instance afterwards gets moved into the copy code (online change)
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[AllocateBuffer();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_reinit" Id="{8554e84b-4e33-4ace-bdbb-247d67068c02}">
+      <Declaration><![CDATA[METHOD FB_reinit : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[AllocateBuffer();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FlushCache" Id="{7065b3ac-ec6e-4c84-8b1a-5bf294b14768}">
+      <Declaration><![CDATA[METHOD FlushCache : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbFifoBuffer.A_Reset();]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="IsEmpty" Id="{30bda316-0c7b-4fa4-bc23-913c64b0b135}">
+      <Declaration><![CDATA[PROPERTY IsEmpty : BOOL]]></Declaration>
+      <Get Name="Get" Id="{c45127f5-b008-4321-bca4-7b7d6e8e1380}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[IsEmpty := fbFifoBuffer.nCount = 0;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="PopHead" Id="{cfa5d531-c7d5-4436-a514-eeddb9580656}">
+      <Declaration><![CDATA[METHOD PopHead : BOOL
+VAR_IN_OUT
+    resultString : STRING( Parameter.MAX_LOG_STRING_SIZE * 2 );
+END_VAR
+VAR
+    pResult        : POINTER TO BYTE;
+    nRemainingSize : UDINT;
+    pHead          : POINTER TO BYTE;
+    nHeadSize      : UDINT;
+    nFifoCount     : UDINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+// create pointer and size for result
+pResult := ADR( resultString );
+nRemainingSize := SIZEOF( resultString );
+
+// Clear result
+MEMSET( pResult, 0, nRemainingSize );
+
+// Check current buffered strings
+nFifoCount := fbFifoBuffer.nCount;
+
+IF nFifoCount = 0 THEN
+    RETURN;
+END_IF
+
+// Create pointer and size for head string
+pHead := ADR( headString );
+nHeadSize := SIZEOF( headString );
+
+REPEAT
+    // Clear head data
+    MEMSET( pHead, 0, nHeadSize );
+    // get (not pop) head data
+    fbFifoBuffer.A_GetHead( pRead := pHead, cbRead := nHeadSize );
+    // get string size
+    nHeadLen := LEN2( pHead );
+
+    // Check if head still fits into result string
+    IF nRemainingSize - nHeadLen - 1 > 0 THEN
+        // If it fits 
+        PopHead := TRUE;
+
+        // Copy data
+        MEMCPY( pResult, pHead, nHeadLen );
+
+        // Move pointer to next result position and set remaining size
+        pResult := pResult + nHeadLen;
+        nRemainingSize := nRemainingSize - nHeadLen;
+
+        // Remove the copied entry
+        fbFifoBuffer.A_RemoveHead();
+        nFifoCount := nFifoCount - 1;
+    END_IF
+UNTIL
+
+	// unless it does not fit any more or no further buffered data
+    nRemainingSize - nHeadLen - 1 <= 0 OR nFifoCount = 0
+END_REPEAT;
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

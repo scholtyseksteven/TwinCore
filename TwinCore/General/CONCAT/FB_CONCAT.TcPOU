@@ -1,0 +1,38 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <POU Name="FB_CONCAT" Id="{ef95f8d1-2c97-443e-8413-947204f2f51b}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_CONCAT 
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+    {attribute 'hide'}
+	tmp:	STRING := '';
+    {attribute 'hide'}
+	_nDstSize	: UDINT;
+	
+	_fbConcatStrings	: FB_CONCAT_STRINGS;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="SetDstString" Id="{58a214c2-57a4-4c1f-ae5b-9ee0c5cd5b16}">
+      <Declaration><![CDATA[METHOD PUBLIC SetDstString : I_CONCAT
+VAR_INPUT
+	anyDstString	: ANY_STRING;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+_fbConcatStrings._pDstString := anyDstString.pValue;
+_fbConcatStrings._nDstSize := DINT_TO_UDINT( anyDstString.diSize );
+_fbConcatStrings._pDstString^ := '';
+
+SetDstString := _fbConcatStrings;
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

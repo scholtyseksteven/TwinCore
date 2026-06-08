@@ -1,0 +1,126 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <POU Name="FB_SystemTimeService" Id="{e7be0e53-d4cf-444b-86b4-b19d0caa481a}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_SystemTimeService
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+    fbSystemTime    : FB_LocalSystemTime;
+    sFileTimeString : STRING;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[
+fbSystemTime(
+	sNetID := '',
+	bEnable := TRUE,
+	dwCycle := 1,
+	dwOpt := 0,
+	tTimeout := DEFAULT_ADS_TIMEOUT
+);
+
+CalculateFileTimeString();
+]]></ST>
+    </Implementation>
+    <Method Name="CalculateFileTimeString" Id="{4926ae19-31cd-40b3-9d70-7237a41f6da2}">
+      <Declaration><![CDATA[METHOD PRIVATE CalculateFileTimeString : BOOL
+VAR_INPUT
+END_VAR
+VAR
+    srawString      : STRING;
+    sDeletedString  : STRING;
+    sDeletedString2 : STRING;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+srawString := ToString;
+
+FindAndDeleteChar( ADR( srawString ), '-', ADR( sDeletedString ), SIZEOF( sDeletedString ) );
+FindAndDeleteChar( ADR( sDeletedString ), ':', ADR( sDeletedString2 ), SIZEOF( sDeletedString2 ) );
+
+sFileTimeSTring := Concat( Insert( LEFT( sDeletedString2, LEN( sDeletedString2 ) - 4 ), '_', 8 ), '_' );
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="DateTime" Id="{18d8d57b-73ed-42f4-8613-1226d7cadce5}">
+      <Declaration><![CDATA[PROPERTY PUBLIC DateTime : DT]]></Declaration>
+      <Get Name="Get" Id="{66cc222c-84be-4d38-aba5-734c1286d56d}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[DateTime := SYSTEMTIME_TO_DT( fbSystemTime.systemTime );]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="IsValid" Id="{19272b67-0e7a-411e-8093-227ed218e72a}">
+      <Declaration><![CDATA[PROPERTY PUBLIC IsValid : BOOL]]></Declaration>
+      <Get Name="Get" Id="{df610bc6-de53-4146-9d82-ae04412c3296}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[IsValid := fbSystemTime.bValid;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="TimeOfDay" Id="{341a2e55-ac4e-4e11-936d-734c2dba4e5c}">
+      <Declaration><![CDATA[PROPERTY PUBLIC TimeOfDay : TOD]]></Declaration>
+      <Get Name="Get" Id="{76a20bbb-63d6-4611-8b37-adbed6704caa}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[TimeOfDay := DT_TO_TOD( DateTime );]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="TimeOfDayToString" Id="{22839646-4128-4bcc-a8c2-7fe1015fb5dc}">
+      <Declaration><![CDATA[PROPERTY TimeOfDayToString : STRING]]></Declaration>
+      <Get Name="Get" Id="{af561fbb-d828-44d4-91b0-7fc3a6e59850}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[TimeOfDayToString := RIGHT( ToString, 12 );]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="TimeStruct" Id="{3f05f829-eb00-43eb-8f91-db7068b1653e}">
+      <Declaration><![CDATA[PROPERTY PUBLIC TimeStruct : REFERENCE TO TIMESTRUCT]]></Declaration>
+      <Get Name="Get" Id="{28d18ddc-6cbe-4491-95e2-5984bd4cf324}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[TimeStruct REF= fbSystemTime.systemTime;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="ToFileTimeString" Id="{e71fa7ac-d773-433c-9504-3e670c55fe56}">
+      <Declaration><![CDATA[PROPERTY PUBLIC ToFileTimeString : STRING]]></Declaration>
+      <Get Name="Get" Id="{900518f2-afd8-4a49-a87c-dfd50b1defcd}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ToFileTimeString := sFileTimeString;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="ToString" Id="{a4509292-3346-48ce-a241-74c0108a2bf4}">
+      <Declaration><![CDATA[PROPERTY ToString : STRING]]></Declaration>
+      <Get Name="Get" Id="{7af9a5ec-e140-4e9b-9e3a-0068a40211ac}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ToString := SYSTEMTIME_TO_STRING( fbSystemTime.systemTime );]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+  </POU>
+</TcPlcObject>

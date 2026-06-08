@@ -1,0 +1,1289 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <POU Name="FB_EventListenerExtV2" Id="{7aa5cc85-7184-45de-9cea-3f79ebbe4039}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_EventListenerExtV2 EXTENDS FB_ListenerBase2 IMPLEMENTS I_EventListener
+VAR_INPUT
+    bInsertFirst : BOOL := TRUE;
+    aEventClasses: ARRAY[1..Parameter.nMaxEventClasses] OF GUID;
+END_VAR
+VAR
+	ipMessageFilterConfig : ITcEventFilterConfig;
+	ipAlarmFilterConfig : ITcEventFilterConfig;
+	hrFilterConfig : HRESULT;
+END_VAR
+VAR_OUTPUT
+    aEventEntryTable: ARRAY[0..Parameter.nMaxEventEntries] OF ST_EventEntryTableListener;
+    aEvents : ARRAY[1..80] OF ST_ReadEvent; // Legacy Event Table 
+END_VAR
+VAR
+	bEventEntryTableTestandSet : BOOL;
+    fbGetTimeZoneInformation: FB_GetTimeZoneInformation;
+END_VAR
+VAR
+    nCounter : DINT;
+    stSeverestAlarmEntryTable:  ST_EventEntryTableListener;
+    stLastEventEntryTable:  ST_EventEntryTableListener; 
+END_VAR
+VAR
+    nLanguage: INT := 1033;
+    sLanguage: STRING := 'en';
+    bChangeLanguageInterlock : BOOL;
+END_VAR
+VAR	 // Visu variables --- Legacy...
+	nVisuTableIndex : INT := 0;
+	bVisuIndexingPlus: BOOL;
+	bVisuIndexingMinus: BOOL;
+
+	bVisuDisableIndexingPlus: BOOL;
+	bVisuDisableIndexingMinus: BOOL;
+    bCmdDeleteEventsFromTableHmi: BOOL; // HMI
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="ChangeLanguage" Id="{e1ed99b0-0af9-4261-aec0-f6d132dd7dcc}">
+      <Declaration><![CDATA[METHOD PRIVATE ChangeLanguage : HRESULT
+VAR
+    hr : HRESULT;
+    UTF8 : STRING(255);
+END_VAR
+VAR_INST
+    {attribute 'no_copy'}
+    fbRequestText : FB_RequestEventText;
+    {attribute 'no_copy'}
+    fbRequestClassName : FB_RequestEventClassName;
+END_VAR
+VAR_INST
+    stEventEntryTemp: ST_EventEntryTableListener;
+END_VAR
+VAR_INST
+    nStep : E_AlarmMessage;
+    nStepRequestText : E_AlarmMessage := E_AlarmMessage.Done;
+    nStepRequestClass : E_AlarmMessage := E_AlarmMessage.Done;
+END_VAR
+VAR_INST
+    nTranslated : DINT;
+END_VAR
+VAR
+    nEntryIndex : DINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[    ChangeLanguage := E_FAIL;
+    
+    bChangeLanguageInterlock := TRUE;
+	
+// Fast Case of nStep
+    // CASE: E_AlarmMessage.RequestText
+    IF nStep = E_AlarmMessage.RequestText THEN
+        
+        stEventEntryTemp := aEventEntryTable[nTranslated];
+        nStepRequestText := E_AlarmMessage.RequestText;
+        nStepRequestClass := E_AlarmMessage.RequestText;
+        nStep := E_AlarmMessage.ReceiveText;
+	END_IF
+    // CASE: E_AlarmMessage.ReceiveText
+    IF nStep = E_AlarmMessage.ReceiveText THEN
+        IF nStepRequestText = E_AlarmMessage.Done AND
+           nStepRequestClass = E_AlarmMessage.Done THEN
+           nStep := E_AlarmMessage.Insert;
+		END_IF
+	END_IF
+    // CASE: E_AlarmMessage.Insert
+    IF nStep = E_AlarmMessage.Insert THEN
+        
+            nEntryIndex := GetIndex(stEventEntryTemp, FALSE);
+            IF nEntryIndex >= 0 THEN
+                IF stEventEntryTemp.sText <> '{0}' AND stEventEntryTemp.sText <> '' THEN
+                    aEventEntryTable[nEntryIndex].sText := stEventEntryTemp.sText;
+				END_IF
+                IF stEventEntryTemp.EventClassName <> '{0}' AND stEventEntryTemp.EventClassName <> '' THEN
+                    aEventEntryTable[nEntryIndex].EventClassName := stEventEntryTemp.EventClassName;
+				END_IF
+            END_IF
+            stSeverestAlarmEntryTable:=  GetSeverestAlarmEntryTable();
+            stLastEventEntryTable:=  GetLastEventEntryTable(); 
+            UpdateLegacyTable();
+            
+            nStep := E_AlarmMessage.Done;
+	END_IF
+    // CASE: Done   
+    IF nStep = E_AlarmMessage.Done THEN
+        nTranslated := nTranslated + 1;
+            IF nTranslated > nCounter THEN
+                  nTranslated := 0;
+                  ChangeLanguage := S_OK;
+                  bChangeLanguageInterlock := FALSE;
+            END_IF
+            nStep := E_AlarmMessage.RequestText;
+            MEMSET(destAddr:= ADR(stEventEntryTemp), fillByte := 16#00 , n:= SIZEOF(stEventEntryTemp));
+	END_IF     
+
+
+// Fast Case of nStepRequestText
+    // CASE: RequestText   
+    IF nStepRequestText = E_AlarmMessage.RequestText THEN
+        fbRequestText.Request( eventClass:=stEventEntryTemp.EventClass, nEventId:=stEventEntryTemp.nEventId, nLangId:=LangId, ipArgs:=stEventEntryTemp.ipArguments );
+        nStepRequestText := E_AlarmMessage.ReceiveText; 
+	END_IF
+    // CASE: ReceiveText   
+    IF nStepRequestText = E_AlarmMessage.ReceiveText THEN
+        IF NOT fbRequestText.bBusy AND NOT fbRequestText.bError THEN
+            fbRequestText.GetString(UTF8, SIZEOF(UTF8));
+            UTF8_TO_STRING(pDstSTRING:=ADR(stEventEntryTemp.sText) , pSrcUTF8:=ADR(UTF8) , nDstSize:=SIZEOF(stEventEntryTemp.sText) , nDstLen=> );
+            nStepRequestText := E_AlarmMessage.Done;
+        ELSIF fbRequestText.bError THEN 
+            nStepRequestText := E_AlarmMessage.RequestText;
+        END_IF 
+	END_IF
+ 
+// Fast Case of nStepRequestClass
+    // CASE: RequestText   
+    IF nStepRequestClass = E_AlarmMessage.RequestText THEN
+        fbRequestClassName.Request(eventClass:=stEventEntryTemp.EventClass, nLangId:=LangId,);
+        nStepRequestClass := E_AlarmMessage.ReceiveText;
+	END_IF
+    // CASE: ReceiveText   
+    IF nStepRequestClass = E_AlarmMessage.ReceiveText THEN
+        IF NOT fbRequestClassName.bBusy AND NOT fbRequestClassName.bError THEN
+            fbRequestClassName.GetString(UTF8, SIZEOF(UTF8));
+            UTF8_TO_STRING(pDstSTRING:=ADR(stEventEntryTemp.EventClassName) , pSrcUTF8:=ADR(UTF8) , nDstSize:=SIZEOF(stEventEntryTemp.EventClassName) , nDstLen=> );
+            nStepRequestClass := E_AlarmMessage.Done;
+        ELSIF fbRequestClassName.bError THEN 
+            nStepRequestClass := E_AlarmMessage.RequestText;
+        END_IF
+	END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="DeleteEntryFromEventTable" Id="{b34e4387-a1a5-4e45-a0e8-f6fbaca57ba3}">
+      <Declaration><![CDATA[METHOD PRIVATE DeleteEntryFromEventTable : HRESULT
+VAR_INPUT
+	index: UDINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IF NOT ( index >= 0 AND TO_DINT(index) <= Parameter.nMaxEventEntries ) THEN
+	DeleteEntryFromEventTable := E_FAIL;
+	RETURN;
+END_IF
+
+MEMSET( destAddr := ADR(aEventEntryTable[index]), fillByte := 16#00, n := SIZEOF(aEventEntryTable[index]) );
+IF MEMMOVE( srcAddr := ADR(aEventEntryTable[index + 1]), destAddr := ADR(aEventEntryTable[index]), n := ( SIZEOF(aEventEntryTable) - SIZEOF(aEventEntryTable[0]) * ( index + 1 ) ) ) <= 0 THEN
+	DeleteEntryFromEventTable := E_FAIL;
+	RETURN;
+ELSE
+	MEMSET( destAddr := ADR(aEventEntryTable[Parameter.nMaxEventEntries]), fillByte := 16#00, n := SIZEOF(aEventEntryTable[Parameter.nMaxEventEntries]) );
+	nCounter := LIMIT( 0, nCounter - 1, TO_DINT(Parameter.nMaxEventEntries) );
+END_IF
+
+stSeverestAlarmEntryTable := GetSeverestAlarmEntryTable();
+stLastEventEntryTable := GetLastEventEntryTable();
+UpdateLegacyTable();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="DeleteEventsFromTable" Id="{48d1b1eb-42b4-4c54-8ac4-e3732405421d}">
+      <Declaration><![CDATA[METHOD PUBLIC DeleteEventsFromTable : BOOL
+VAR_INPUT
+END_VAR
+VAR_INST
+	i: DINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IF TestandSet(bEventEntryTableTestandSet) THEN
+	IF NOT bChangeLanguageInterlock THEN
+		FOR i := 0 TO Parameter.nMaxEventEntries BY 1 DO
+			IF aEventEntryTable[i].nEventId <> 0
+			AND aEventEntryTable[i].bIsEvent THEN
+				DeleteEntryFromEventTable(DINT_TO_UDINT(i));
+				i := i-1;
+			ELSIF aEventEntryTable[i].nEventId = 0 THEN
+				EXIT;
+			END_IF
+		END_FOR
+	END_IF
+bEventEntryTableTestandSet := FALSE;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Execute" Id="{8e9f46d6-a5b8-43f1-ba11-4ba9d3b90478}">
+      <Declaration><![CDATA[METHOD Execute : HRESULT
+VAR_INST
+    nLanguangeTemp : INT := nLanguage;
+    hrs : HRESULT := S_OK;
+END_VAR
+VAR_INST
+    bGetTimeZone : BOOL := TRUE;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+Execute := SUPER^.Execute(); //retrieve events
+
+HMI();
+
+IF bGetTimeZone THEN
+   bGetTimeZone := FALSE;
+   fbGetTimeZoneInformation( bExecute := TRUE );
+ELSE
+   fbGetTimeZoneInformation( bExecute := FALSE );        
+END_IF
+
+IF nLanguangeTemp <> nLanguage OR hrs <> S_OK THEN
+	IF TestandSet(bEventEntryTableTestandSet) THEN
+		nLanguangeTemp := nLanguage;
+		hrs := ChangeLanguage();
+		bEventEntryTableTestandSet := FALSE;
+	END_IF
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="FlagInsertFirst" Id="{dfb22fcd-5984-4983-9aa4-5136dbc0ba11}">
+      <Declaration><![CDATA[PROPERTY PUBLIC FlagInsertFirst : BOOL]]></Declaration>
+      <Get Name="Get" Id="{995bd102-ee33-4add-8d0c-93ad7ee25537}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[FlagInsertFirst := bInsertFirst;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{be6633c2-fa04-436c-921e-3690cadbfa89}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[bInsertFirst := FlagInsertFirst;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="GetEventByIndex" Id="{a0e75030-4934-4a26-a8dd-ce9a0db4df65}">
+      <Declaration><![CDATA[METHOD PUBLIC GetEventByIndex : HRESULT
+    VAR_OUTPUT
+        sTimestamp: STRING(80); // 
+        sTimestampConfirmed: STRING(80);
+        sTimestampCleared: STRING(80);
+        sText: STRING(255); //
+        sSourceName: STRING(255); //
+        EventClassName: STRING(255); //
+        eConfirmationState : BYTE;
+        eSeverity :  BYTE; // INT
+    END_VAR
+VAR_INPUT
+    nIndex : UDINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF nIndex >= 1 AND nIndex <= TO_UDINT(Parameter.nMaxEventEntries) THEN
+        sTimestamp := aEventEntryTable[nIndex].sTimestamp;
+        sTimestampConfirmed := aEventEntryTable[nIndex].sTimestampConfirmed;
+        sTimestampCleared := aEventEntryTable[nIndex].sTimestampCleared;
+        sText := aEventEntryTable[nIndex].sText; //
+        sSourceName:= aEventEntryTable[nIndex].sSourceName;
+        EventClassName := aEventEntryTable[nIndex].EventClassName;
+        eConfirmationState := TO_BYTE(aEventEntryTable[nIndex].eConfirmationState);
+        eSeverity := TO_BYTE(aEventEntryTable[nIndex].eSeverity);
+        
+        GetEventByIndex := S_OK;
+ELSE
+        GetEventByIndex := E_FAIL;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="GetIndex" Id="{5ab86c2b-c1e1-49d6-99c1-784223561bd2}">
+      <Declaration><![CDATA[METHOD PRIVATE GetIndex : DINT
+VAR_INPUT
+	stEventEntryTableTemp: ST_EventEntryTableListener;
+	bWithTimeStamp: BOOL;
+END_VAR
+VAR
+	i: DINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+GetIndex := -1;
+FOR i := 0 TO TO_DINT(Parameter.nMaxEventEntries) BY 1 DO
+	IF aEventEntryTable[i].nEventId = stEventEntryTableTemp.nEventId
+	AND_THEN aEventEntryTable[i].eSeverity = stEventEntryTableTemp.eSeverity
+	AND_THEN MEMCMP( ADR( aEventEntryTable[i].EventClass ), ADR( stEventEntryTableTemp.EventClass ), SIZEOF( stEventEntryTableTemp.EventClass ) ) = 0
+	AND_THEN aEventEntryTable[i].sSourceName = stEventEntryTableTemp.sSourceName THEN
+		IF bWithTimeStamp THEN 
+			IF aEventEntryTable[i].sTimestamp = stEventEntryTableTemp.sTimestamp THEN
+				GetIndex := i;
+			END_IF
+		END_IF
+			GetIndex := i;
+		EXIT;
+	END_IF
+END_FOR
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="GetLastEventEntryTable" Id="{685b23a3-6ecc-41f4-860e-894f3d577f97}">
+      <Declaration><![CDATA[METHOD PRIVATE GetLastEventEntryTable : ST_EventEntryTableListener
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IF bInsertFirst THEN
+    GetLastEventEntryTable := aEventEntryTable[0];
+ELSE
+    GetLastEventEntryTable := aEventEntryTable[LIMIT( 0, nCounter - 1, Parameter.nMaxEventEntries)];
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="GetSeverestAlarmEntryTable" Id="{803cdce1-5dd4-4782-8db0-41099813e6ee}">
+      <Declaration><![CDATA[METHOD PRIVATE GetSeverestAlarmEntryTable : ST_EventEntryTableListener
+VAR_INPUT
+END_VAR
+VAR
+    i : DINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF bInsertFirst THEN
+    FOR i := TO_DINT(LIMIT( 0, (nCounter - 1), TO_DINT(Parameter.nMaxEventEntries))) TO 0 BY (- 1) DO
+        IF aEventEntryTable[i].bIsAlarm AND NOT GetSeverestAlarmEntryTable.bIsAlarm THEN
+            GetSeverestAlarmEntryTable := aEventEntryTable[i];
+        ELSIF aEventEntryTable[i].eSeverity >= GetSeverestAlarmEntryTable.eSeverity THEN
+            GetSeverestAlarmEntryTable := aEventEntryTable[i];
+        END_IF
+    END_FOR  
+ELSE
+    FOR i := 0 TO TO_DINT(LIMIT( 0, (nCounter - 1), TO_DINT(Parameter.nMaxEventEntries))) DO
+        IF aEventEntryTable[i].bIsAlarm AND NOT GetSeverestAlarmEntryTable.bIsAlarm THEN
+            GetSeverestAlarmEntryTable := aEventEntryTable[i];
+        ELSIF aEventEntryTable[i].eSeverity >= GetSeverestAlarmEntryTable.eSeverity THEN
+            GetSeverestAlarmEntryTable := aEventEntryTable[i];
+        END_IF
+    END_FOR 
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HMI" Id="{a7c2b5b3-1d3f-4554-b6c2-9e8f54d6835a}">
+      <Declaration><![CDATA[METHOD PRIVATE HMI : BOOL
+VAR_INST
+    nCounterTemp : DINT;
+    trigVisuIndexingPlus: R_TRIG;
+	trigVisuIndexingMinus: R_TRIG;
+    trigDeleteEventsFromTabl: R_TRIG;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF nCounterTemp <> nCounter THEN
+    nCounterTemp := nCounter;
+    nVisuTableIndex := 0;
+END_IF
+
+IF nVisuTableIndex <= nCounter - Parameter.nNUM_OF_MESSAGES_VISU
+AND nCounter > Parameter.nNUM_OF_MESSAGES_VISU
+AND nVisuTableIndex < UINT_TO_INT( Parameter.nMaxEventEntries ) THEN
+	bVisuDisableIndexingPlus := FALSE;
+ELSE
+	bVisuDisableIndexingPlus := TRUE;
+END_IF
+
+IF nVisuTableIndex > 0 THEN
+	bVisuDisableIndexingMinus := FALSE;
+ELSE
+	bVisuDisableIndexingMinus := TRUE;
+END_IF
+
+trigVisuIndexingPlus( clk := bVisuIndexingPlus );
+IF trigVisuIndexingPlus.Q THEN
+	nVisuTableIndex := nVisuTableIndex + 1;
+END_IF
+
+trigVisuIndexingMinus( clk := bVisuIndexingMinus );
+IF trigVisuIndexingMinus.Q THEN
+	nVisuTableIndex := nVisuTableIndex - 1;
+END_IF
+
+trigDeleteEventsFromTabl( CLK := bCmdDeleteEventsFromTableHmi );
+IF trigDeleteEventsFromTabl.Q THEN
+	DeleteEventsFromTable();
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Initialize" Id="{266aebee-4bee-4814-86d2-4c860b19e957}">
+      <Declaration><![CDATA[METHOD Initialize : HRESULT
+VAR_INPUT
+END_VAR
+VAR
+    i : UINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+hrFilterConfig := THIS^.Unsubscribe();
+hrFilterConfig := THIS^.Subscribe( ADR(ipMessageFilterConfig), ADR(ipAlarmFilterConfig) );
+
+IF ( ipMessageFilterConfig <> 0 ) AND hrFilterConfig = S_OK THEN
+	FOR i := 1 TO Parameter.nMaxEventClasses DO 
+        IF MEMCMP( ADR(aEventClasses[i]), ADR(EMPTY_GUID_STRUCT), SIZEOF(EMPTY_GUID_STRUCT) ) > 0 THEN
+            ipMessageFilterConfig.AddEventClass( aEventClasses[i], TcEventSeverity.Verbose );
+        END_IF
+    END_FOR
+END_IF
+
+IF ( ipAlarmFilterConfig <> 0 ) AND hrFilterConfig = S_OK THEN
+	FOR i := 1 TO Parameter.nMaxEventClasses DO 
+        IF MEMCMP( ADR(aEventClasses[i]), ADR(EMPTY_GUID_STRUCT), SIZEOF(EMPTY_GUID_STRUCT) ) > 0 THEN
+            ipAlarmFilterConfig.AddEventClass( aEventClasses[i], TcEventSeverity.Verbose );
+        END_IF
+    END_FOR
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Insert" Id="{5c1ca9c1-34b4-4ebf-85e6-5f56bb258307}">
+      <Declaration><![CDATA[METHOD PRIVATE Insert : HRESULT
+VAR_INPUT
+    stEventEntryTable: ST_EventEntryTableListener;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF bInsertFirst THEN
+    Insert := InsertFirst(stEventEntryTable := stEventEntryTable);
+ELSE
+    Insert := InsertLast(stEventEntryTable := stEventEntryTable);
+END_IF
+    stSeverestAlarmEntryTable:=  GetSeverestAlarmEntryTable();
+    stLastEventEntryTable:=  GetLastEventEntryTable();
+    UpdateLegacyTable();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="InsertFirst" Id="{58426be6-0a39-44fe-ae57-600e149b0f12}">
+      <Declaration><![CDATA[METHOD PRIVATE InsertFirst : HRESULT
+VAR_INPUT
+    stEventEntryTable: ST_EventEntryTableListener;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF Parameter.nMaxEventEntries <= 0 THEN
+	InsertFirst := E_FAIL;
+	RETURN;
+END_IF
+
+InsertFirst := E_FAIL;
+
+nCounter := nCounter + 1;
+IF nCounter > TO_DINT(Parameter.nMaxEventEntries) THEN
+	nCounter := TO_DINT(Parameter.nMaxEventEntries);
+END_IF
+
+IF MEMMOVE(srcAddr := ADR(aEventEntryTable[0]), destAddr := ADR(aEventEntryTable[1]), n := (SIZEOF(aEventEntryTable)- SIZEOF(aEventEntryTable[0]))) <= 0 THEN
+	InsertFirst := E_FAIL;
+	RETURN;
+END_IF
+aEventEntryTable[0] := stEventEntryTable;
+
+InsertFirst := S_OK;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="InsertLast" Id="{9d3891ea-4a27-4c72-a2e3-a527c74f7d59}">
+      <Declaration><![CDATA[METHOD PRIVATE InsertLast : HRESULT
+VAR_INPUT
+    stEventEntryTable: ST_EventEntryTableListener;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF Parameter.nMaxEventEntries <= 0 THEN
+	InsertLast := E_FAIL;
+	RETURN;
+END_IF
+
+InsertLast := E_FAIL;
+
+nCounter := nCounter + 1;
+IF (nCounter - 1) <= TO_DINT(Parameter.nMaxEventEntries) THEN
+	aEventEntryTable[nCounter-1] := stEventEntryTable;   
+ELSE
+	IF MEMMOVE(srcAddr := ADR(aEventEntryTable[1]), destAddr := ADR(aEventEntryTable[0]), n := (SIZEOF(aEventEntryTable)-SIZEOF(aEventEntryTable[0]))) <= 0 THEN
+		InsertLast := E_FAIL;
+		RETURN;
+	END_IF
+	aEventEntryTable[Parameter.nMaxEventEntries] := stEventEntryTable;
+    nCounter := TO_DINT(Parameter.nMaxEventEntries);
+END_IF
+
+InsertLast := S_OK;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="isErrorRaised" Id="{6c5656b0-9c60-4b74-b641-5da312c7b974}">
+      <Declaration><![CDATA[METHOD PUBLIC isErrorRaised : BOOL
+VAR_INPUT
+	nZoneIdToCheck	: UDINT;
+END_VAR
+VAR
+	i	: UINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+isErrorRaised := FALSE;
+FOR i := 0 TO Parameter.nMaxEventEntries BY 1 DO
+	IF aEventEntryTable[i].nSourceId = nZoneIdToCheck
+	AND aEventEntryTable[i].bIsAlarm THEN
+		isErrorRaised := TRUE;
+		EXIT;
+	END_IF
+END_FOR
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="LangId" Id="{fd32f31e-30ef-4ce3-b893-7abe655a734a}">
+      <Declaration><![CDATA[PROPERTY PUBLIC LangId : INT]]></Declaration>
+      <Get Name="Get" Id="{4f5421fe-6494-4e27-b883-e576cc3b159b}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[LangId := nLanguage;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{69cae792-0071-44f9-86cb-dba3969d3cd8}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[nLanguage := LangId;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="LanguageId" Id="{68bc99ac-1919-4fd0-9ae4-0a83bea55af1}">
+      <Declaration><![CDATA[METHOD PUBLIC LanguageId : HRESULT
+VAR_INPUT
+	sCurrentLanguage	: STRING;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+// Set language
+IF sLanguage <> sCurrentLanguage THEN
+	IF sCurrentLanguage = 'de' OR sCurrentLanguage = 'DE' THEN
+		LangId := 1031;
+	ELSIF sCurrentLanguage = 'en' OR sCurrentLanguage = 'EN' OR sCurrentLanguage = 'gb' OR sCurrentLanguage = 'GB' THEN
+		LangId := 1033;
+	ELSIF sCurrentLanguage = 'cz' OR sCurrentLanguage = 'CZ' THEN
+		LangId := 1029;
+	END_IF
+	sLanguage := sCurrentLanguage;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="LastEventEntryTable" Id="{4cbcce61-7200-4e52-9b85-eb2bf4f91cf2}">
+      <Declaration><![CDATA[PROPERTY PUBLIC LastEventEntryTable : ST_EventEntryTableListener]]></Declaration>
+      <Get Name="Get" Id="{0848c45a-9c33-4aa5-9596-e9337e200995}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[LastEventEntryTable := stLastEventEntryTable;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="NumberActiveEvents" Id="{8e40efa1-7fd7-4c2f-93df-76b5e09ae376}">
+      <Declaration><![CDATA[PROPERTY PUBLIC NumberActiveEvents : UDINT;
+]]></Declaration>
+      <Get Name="Get" Id="{5f261dc0-fc05-41cc-88e0-c2e183c1cf52}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[NumberActiveEvents := TO_UDINT(nCounter);]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="OnAlarmCleared" Id="{3827ea82-4118-4e01-902b-53c861cbedbc}">
+      <Declaration><![CDATA[METHOD OnAlarmCleared : HRESULT
+VAR_INPUT
+	fbEvent : REFERENCE TO FB_TcEvent;
+END_VAR
+VAR
+    hr : HRESULT;
+    UTF8 : STRING(255);
+END_VAR
+VAR_INST
+    {attribute 'no_copy'}
+    fbRequestText : FB_RequestEventText;
+    {attribute 'no_copy'}
+    fbRequestClassName : FB_RequestEventClassName;
+END_VAR
+VAR_INST
+    stEventEntryTemp: ST_EventEntryTableListener;
+END_VAR
+VAR_INST
+    nStep : E_AlarmMessage;
+    nStepRequestText : E_AlarmMessage := E_AlarmMessage.Done;
+    nStepRequestClass : E_AlarmMessage := E_AlarmMessage.Done;
+	
+	nCounterNothingFound : DINT;
+END_VAR
+VAR
+    nEntryIndex : DINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IF NOT __ISVALIDREF(fbEvent) THEN
+	RETURN;
+ELSE
+	OnAlarmCleared := E_FAIL; // in order to receive more callbacks (Set <> S_OK in order to cancel the callbacks for this program cycle.)
+	IF bChangeLanguageInterlock THEN
+		RETURN;
+	END_IF    
+END_IF
+
+// Fast Case of nStep
+    // CASE: E_AlarmMessage.RequestText
+    
+    IF nStep = E_AlarmMessage.RequestText THEN
+        nStepRequestText := E_AlarmMessage.RequestText;
+        nStepRequestClass := E_AlarmMessage.RequestText;
+        nStep := E_AlarmMessage.ReceiveText;
+	END_IF
+    // CASE: E_AlarmMessage.ReceiveText
+    IF nStep = E_AlarmMessage.ReceiveText THEN
+        IF nStepRequestText = E_AlarmMessage.Done AND
+           nStepRequestClass = E_AlarmMessage.Done THEN
+           nStep := E_AlarmMessage.Insert;
+		END_IF
+	END_IF
+    // CASE: E_AlarmMessage.Insert
+    IF nStep = E_AlarmMessage.Insert THEN
+        
+            stEventEntryTemp.sSourceName := fbEvent.ipSourceInfo.sName;
+			stEventEntryTemp.nSourceId := fbEvent.ipSourceInfo.nId;
+            stEventEntryTemp.eSeverity := fbEvent.eSeverity;
+            IF stEventEntryTemp.eSeverity = 0 THEN stEventEntryTemp.sSeverity := 'Verbose';
+            ELSIF stEventEntryTemp.eSeverity = 1 THEN stEventEntryTemp.sSeverity := 'Info';
+            ELSIF stEventEntryTemp.eSeverity = 2 THEN stEventEntryTemp.sSeverity := 'Warning';
+            ELSIF stEventEntryTemp.eSeverity = 3 THEN stEventEntryTemp.sSeverity := 'Error';
+            ELSIF stEventEntryTemp.eSeverity = 4 THEN stEventEntryTemp.sSeverity := 'Critical'; END_IF
+            stEventEntryTemp.EventClass := fbEvent.EventClass;
+            stEventEntryTemp.nEventId := fbEvent.nEventId;
+            stEventEntryTemp.ipArguments := fbEvent.ipArguments;
+            
+			IF TestandSet(bEventEntryTableTestandSet) THEN	
+            nEntryIndex := GetIndex(stEventEntryTemp, FALSE);
+            IF nEntryIndex >= 0 THEN
+
+                aEventEntryTable[nEntryIndex].bLogged := FALSE;
+                aEventEntryTable[nEntryIndex].eConfirmationState := TcEventConfirmationState.Reset;
+                aEventEntryTable[nEntryIndex].sTimestampLog := SYSTEMTIME_TO_STRING(UlintToSystemTime(fbEvent.nTimestamp, fbGetTimeZoneInformation.tzInfo));
+                aEventEntryTable[nEntryIndex].sTimestampCleared := SYSTEMTIME_TO_STRING(UlintToSystemTime(fbEvent.nTimestamp, fbGetTimeZoneInformation.tzInfo));
+
+                aEventEntryTable[nEntryIndex].sTimestampCleared := SYSTEMTIME_TO_STRING(UlintToSystemTime(fbEvent.nTimestamp, fbGetTimeZoneInformation.tzInfo));
+                stEventEntryTemp := aEventEntryTable[nEntryIndex];
+
+                DeleteEntryFromEventTable(TO_UDINT(nEntryIndex));
+            	nCounterNothingFound := 0;
+			ELSE
+				nCounterNothingFound := nCounterNothingFound + 1;
+				IF nCounterNothingFound <= 20 THEN 
+				bEventEntryTableTestandSet := FALSE;
+				RETURN;	
+				END_IF
+				nCounterNothingFound := 0;
+            END_IF
+            
+            stSeverestAlarmEntryTable:=  GetSeverestAlarmEntryTable();
+            stLastEventEntryTable:=  GetLastEventEntryTable();
+            UpdateLegacyTable(); 
+            
+            stEventEntryTemp.stAlarmLog.sTimestamp := stEventEntryTemp.sTimestampLog;      
+            stEventEntryTemp.stAlarmLog.eConfirmationState := stEventEntryTemp.eConfirmationState;
+            stEventEntryTemp.stAlarmLog.eSeverity := stEventEntryTemp.eSeverity;
+            stEventEntryTemp.stAlarmLog.EventClassName := stEventEntryTemp.EventClassName;
+            stEventEntryTemp.stAlarmLog.sSourceName := stEventEntryTemp.sSourceName;
+            stEventEntryTemp.stAlarmLog.sText := stEventEntryTemp.sText;
+            stEventEntryTemp.stAlarmLog.sTimestamp := REPLACE(STR1:= stEventEntryTemp.stAlarmLog.sTimestamp, STR2 := ' ',L := 1, P := 11);
+
+            nStep := E_AlarmMessage.Done;
+
+			bEventEntryTableTestandSet := FALSE;	
+			END_IF	
+	END_IF
+    // CASE: Done   
+    IF nStep = E_AlarmMessage.Done THEN  
+            OnAlarmCleared := S_OK;
+            nStep := E_AlarmMessage.RequestText;
+            MEMSET(destAddr:= ADR(stEventEntryTemp), fillByte := 16#00 , n:= SIZEOF(stEventEntryTemp)); 
+	END_IF     
+
+
+// Fast Case of nStepRequestText
+    // CASE: RequestText   
+    IF nStepRequestText = E_AlarmMessage.RequestText THEN
+        fbRequestText.Request(eventClass:=fbEvent.EventClass, nEventId:=fbEvent.nEventId, nLangId:=LangId, ipArgs:=fbEvent.ipArguments );
+        nStepRequestText := E_AlarmMessage.ReceiveText; 
+	END_IF
+    // CASE: ReceiveText   
+    IF nStepRequestText = E_AlarmMessage.ReceiveText THEN
+        IF NOT fbRequestText.bBusy AND NOT fbRequestText.bError THEN
+            fbRequestText.GetString(UTF8, SIZEOF(UTF8));
+            UTF8_TO_STRING(pDstSTRING:=ADR(stEventEntryTemp.sText) , pSrcUTF8:=ADR(UTF8) , nDstSize:=SIZEOF(stEventEntryTemp.sText) , nDstLen=> );
+            nStepRequestText := E_AlarmMessage.Done;
+        ELSIF fbRequestText.bError THEN 
+            nStepRequestText := E_AlarmMessage.RequestText;
+        END_IF 
+	END_IF
+ 
+// Fast Case of nStepRequestClass
+    // CASE: RequestText   
+    IF nStepRequestClass = E_AlarmMessage.RequestText THEN
+        fbRequestClassName.Request(eventClass:=fbEvent.EventClass, nLangId:=LangId,);
+        nStepRequestClass := E_AlarmMessage.ReceiveText;
+	END_IF
+    // CASE: ReceiveText   
+    IF nStepRequestClass = E_AlarmMessage.ReceiveText THEN
+        IF NOT fbRequestClassName.bBusy AND NOT fbRequestClassName.bError THEN
+            fbRequestClassName.GetString(UTF8, SIZEOF(UTF8));
+            UTF8_TO_STRING(pDstSTRING:=ADR(stEventEntryTemp.EventClassName) , pSrcUTF8:=ADR(UTF8) , nDstSize:=SIZEOF(stEventEntryTemp.EventClassName) , nDstLen=> );
+            nStepRequestClass := E_AlarmMessage.Done;
+        ELSIF fbRequestClassName.bError THEN 
+            nStepRequestClass := E_AlarmMessage.RequestText;
+        END_IF
+	END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="OnAlarmConfirmed" Id="{0e8c7b74-5ff3-42f0-bdd9-fb30181e8e00}">
+      <Declaration><![CDATA[METHOD OnAlarmConfirmed : HRESULT
+VAR_INPUT
+	fbEvent : REFERENCE TO FB_TcEvent;
+END_VAR
+VAR
+    hr : HRESULT;
+    UTF8 : STRING(255);
+END_VAR
+VAR_INST
+    {attribute 'no_copy'}
+    fbRequestText : FB_RequestEventText;
+    {attribute 'no_copy'}
+    fbRequestClassName : FB_RequestEventClassName;
+	
+	nCounterNothingFound : DINT;
+END_VAR
+VAR_INST
+    stEventEntryTemp: ST_EventEntryTableListener;
+END_VAR
+VAR_INST
+    nStep : E_AlarmMessage;
+    nStepRequestText : E_AlarmMessage := E_AlarmMessage.Done;
+    nStepRequestClass : E_AlarmMessage := E_AlarmMessage.Done;
+END_VAR
+VAR
+nConfirmEntryIndex : DINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IF NOT __ISVALIDREF(fbEvent) THEN
+	RETURN;
+ELSE
+	OnAlarmConfirmed := E_FAIL; // in order to receive more callbacks (Set <> S_OK in order to cancel the callbacks for this program cycle.)
+	IF bChangeLanguageInterlock THEN
+		RETURN;
+	END_IF    
+END_IF
+
+// Fast Case of nStep
+// CASE: E_AlarmMessage.RequestText
+IF nStep = E_AlarmMessage.RequestText THEN
+	nStepRequestText := E_AlarmMessage.RequestText;
+	nStepRequestClass := E_AlarmMessage.RequestText;
+	nStep := E_AlarmMessage.ReceiveText;
+END_IF
+
+// CASE: E_AlarmMessage.ReceiveText
+IF nStep = E_AlarmMessage.ReceiveText THEN
+	IF nStepRequestText = E_AlarmMessage.Done AND
+		nStepRequestClass = E_AlarmMessage.Done THEN
+		nStep := E_AlarmMessage.Insert;
+	END_IF
+END_IF
+
+// CASE: E_AlarmMessage.Insert
+IF nStep = E_AlarmMessage.Insert THEN
+	
+	stEventEntryTemp.sSourceName := fbEvent.ipSourceInfo.sName;
+	stEventEntryTemp.nSourceId := fbEvent.ipSourceInfo.nId;
+	stEventEntryTemp.eSeverity := fbEvent.eSeverity;
+	IF stEventEntryTemp.eSeverity = 0 THEN stEventEntryTemp.sSeverity := 'Verbose';
+	ELSIF stEventEntryTemp.eSeverity = 1 THEN stEventEntryTemp.sSeverity := 'Info';
+	ELSIF stEventEntryTemp.eSeverity = 2 THEN stEventEntryTemp.sSeverity := 'Warning';
+	ELSIF stEventEntryTemp.eSeverity = 3 THEN stEventEntryTemp.sSeverity := 'Error';
+	ELSIF stEventEntryTemp.eSeverity = 4 THEN stEventEntryTemp.sSeverity := 'Critical'; END_IF
+	stEventEntryTemp.EventClass := fbEvent.EventClass;
+	stEventEntryTemp.nEventId := fbEvent.nEventId;
+	stEventEntryTemp.ipArguments := fbEvent.ipArguments;
+
+	IF TestandSet(bEventEntryTableTestandSet) THEN
+
+		nConfirmEntryIndex := GetIndex(stEventEntryTemp, FALSE);
+		IF nConfirmEntryIndex >= 0 THEN
+			aEventEntryTable[nConfirmEntryIndex].bLogged := FALSE;
+			aEventEntryTable[nConfirmEntryIndex].eConfirmationState := TcEventConfirmationState.Confirmed;
+			aEventEntryTable[nConfirmEntryIndex].sTimestampConfirmed := SYSTEMTIME_TO_STRING(UlintToSystemTime(fbEvent.nTimestamp, fbGetTimeZoneInformation.tzInfo));
+			aEventEntryTable[nConfirmEntryIndex].sTimestampLog := aEventEntryTable[nConfirmEntryIndex].sTimestampConfirmed;
+			stEventEntryTemp := aEventEntryTable[nConfirmEntryIndex];
+			nCounterNothingFound := 0;
+		ELSE
+			nCounterNothingFound := nCounterNothingFound + 1;
+			IF nCounterNothingFound <= 20 THEN 
+				bEventEntryTableTestandSet := FALSE;
+				RETURN;	
+			END_IF
+			nCounterNothingFound := 0;	
+		END_IF
+
+		stSeverestAlarmEntryTable := GetSeverestAlarmEntryTable();
+		stLastEventEntryTable := GetLastEventEntryTable(); 
+		UpdateLegacyTable();
+	
+		stEventEntryTemp.stAlarmLog.sTimestamp := stEventEntryTemp.sTimestampLog;      
+		stEventEntryTemp.stAlarmLog.eConfirmationState := stEventEntryTemp.eConfirmationState;
+		stEventEntryTemp.stAlarmLog.eSeverity := stEventEntryTemp.eSeverity;
+		stEventEntryTemp.stAlarmLog.EventClassName := stEventEntryTemp.EventClassName;
+		stEventEntryTemp.stAlarmLog.sSourceName := stEventEntryTemp.sSourceName;
+		stEventEntryTemp.stAlarmLog.sText := stEventEntryTemp.sText;
+		stEventEntryTemp.stAlarmLog.sTimestamp := REPLACE(STR1:= stEventEntryTemp.stAlarmLog.sTimestamp, STR2 := ' ',L := 1, P := 11);
+	
+		nStep := E_AlarmMessage.Done;
+					
+		bEventEntryTableTestandSet := FALSE;
+	END_IF
+END_IF
+
+// CASE: Done   
+IF nStep = E_AlarmMessage.Done THEN  
+	OnAlarmConfirmed := S_OK;
+	nStep := E_AlarmMessage.RequestText;
+	MEMSET(destAddr := ADR(stEventEntryTemp), fillByte := 16#00 , n:= SIZEOF(stEventEntryTemp)); 
+END_IF     
+
+// Fast Case of nStepRequestText
+// CASE: RequestText   
+IF nStepRequestText = E_AlarmMessage.RequestText THEN
+	fbRequestText.Request(eventClass:=fbEvent.EventClass, nEventId:=fbEvent.nEventId, nLangId:=LangId, ipArgs:=fbEvent.ipArguments );
+	nStepRequestText := E_AlarmMessage.ReceiveText; 
+END_IF
+// CASE: ReceiveText   
+IF nStepRequestText = E_AlarmMessage.ReceiveText THEN
+	IF NOT fbRequestText.bBusy AND NOT fbRequestText.bError THEN
+		fbRequestText.GetString(UTF8, SIZEOF(UTF8));
+		UTF8_TO_STRING(pDstSTRING:=ADR(stEventEntryTemp.sText) , pSrcUTF8:=ADR(UTF8) , nDstSize:=SIZEOF(stEventEntryTemp.sText) , nDstLen=> );
+		nStepRequestText := E_AlarmMessage.Done;
+	ELSIF fbRequestText.bError THEN 
+		nStepRequestText := E_AlarmMessage.RequestText;
+	END_IF 
+END_IF
+ 
+// Fast Case of nStepRequestClass
+// CASE: RequestText   
+IF nStepRequestClass = E_AlarmMessage.RequestText THEN
+	fbRequestClassName.Request(eventClass:=fbEvent.EventClass, nLangId:=LangId,);
+	nStepRequestClass := E_AlarmMessage.ReceiveText;
+END_IF
+// CASE: ReceiveText   
+IF nStepRequestClass = E_AlarmMessage.ReceiveText THEN
+	IF NOT fbRequestClassName.bBusy AND NOT fbRequestClassName.bError THEN
+		fbRequestClassName.GetString(UTF8, SIZEOF(UTF8));
+		UTF8_TO_STRING(pDstSTRING:=ADR(stEventEntryTemp.EventClassName) , pSrcUTF8:=ADR(UTF8) , nDstSize:=SIZEOF(stEventEntryTemp.EventClassName) , nDstLen=> );
+		nStepRequestClass := E_AlarmMessage.Done;
+	ELSIF fbRequestClassName.bError THEN 
+		nStepRequestClass := E_AlarmMessage.RequestText;
+	END_IF
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="OnAlarmRaised" Id="{87411097-f583-41b7-85c0-bc71827d1a4f}">
+      <Declaration><![CDATA[METHOD OnAlarmRaised : HRESULT
+VAR_INPUT
+	fbEvent : REFERENCE TO FB_TcEvent;
+END_VAR
+VAR
+    hr : HRESULT;
+    UTF8 : STRING(255);
+END_VAR
+VAR_INST
+    {attribute 'no_copy'}
+    fbRequestText : FB_RequestEventText;
+    {attribute 'no_copy'}
+    fbRequestClassName : FB_RequestEventClassName;
+END_VAR
+VAR_INST
+    stEventEntryTemp: ST_EventEntryTableListener;
+END_VAR
+VAR_INST
+    nStep : E_AlarmMessage;
+    nStepRequestText : E_AlarmMessage := E_AlarmMessage.Done;
+    nStepRequestClass : E_AlarmMessage := E_AlarmMessage.Done;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IF NOT __ISVALIDREF(fbEvent) THEN
+	RETURN;
+ELSE
+	OnAlarmRaised := E_FAIL; // in order to receive more callbacks (Set <> S_OK in order to cancel the callbacks for this program cycle.)
+	IF bChangeLanguageInterlock THEN
+		RETURN;
+	END_IF      
+END_IF
+
+// Fast Case of nStep
+// CASE: E_AlarmMessage.RequestText
+IF nStep = E_AlarmMessage.RequestText THEN
+	nStepRequestText := E_AlarmMessage.RequestText;
+	nStepRequestClass := E_AlarmMessage.RequestText;
+	nStep := E_AlarmMessage.ReceiveText;
+END_IF
+
+// CASE: E_AlarmMessage.ReceiveText
+IF nStep = E_AlarmMessage.ReceiveText THEN
+	IF nStepRequestText = E_AlarmMessage.Done AND
+	   nStepRequestClass = E_AlarmMessage.Done THEN
+	   nStep := E_AlarmMessage.Insert;
+	END_IF
+END_IF
+
+// CASE: E_AlarmMessage.Insert
+IF nStep = E_AlarmMessage.Insert THEN
+
+	hr := fbEvent.GetJsonAttribute(stEventEntryTemp.sJsonAttribute, SIZEOF(stEventEntryTemp.sJsonAttribute));
+	stEventEntryTemp.sSourceName := fbEvent.ipSourceInfo.sName;
+	stEventEntryTemp.nSourceId := fbEvent.ipSourceInfo.nId;
+	stEventEntryTemp.eSeverity := fbEvent.eSeverity;
+	IF stEventEntryTemp.eSeverity = 0 THEN stEventEntryTemp.sSeverity := 'Verbose';
+	ELSIF stEventEntryTemp.eSeverity = 1 THEN stEventEntryTemp.sSeverity := 'Info';
+	ELSIF stEventEntryTemp.eSeverity = 2 THEN stEventEntryTemp.sSeverity := 'Warning';
+	ELSIF stEventEntryTemp.eSeverity = 3 THEN stEventEntryTemp.sSeverity := 'Error';
+	ELSIF stEventEntryTemp.eSeverity = 4 THEN stEventEntryTemp.sSeverity := 'Critical'; END_IF
+	stEventEntryTemp.EventClass := fbEvent.EventClass;
+	stEventEntryTemp.sTimestamp := SYSTEMTIME_TO_STRING(UlintToSystemTime(fbEvent.nTimestamp, fbGetTimeZoneInformation.tzInfo));
+	stEventEntryTemp.sTimestampLog := stEventEntryTemp.sTimestamp;
+	stEventEntryTemp.nEventId := fbEvent.nEventId;
+	stEventEntryTemp.ipArguments := fbEvent.ipArguments;
+	stEventEntryTemp.eConfirmationState := TcEventConfirmationState.WaitForConfirmation;
+	stEventEntryTemp.bIsAlarm := TRUE;
+
+	stEventEntryTemp.stAlarmLog.sTimestamp := stEventEntryTemp.sTimestampLog;      
+	stEventEntryTemp.stAlarmLog.eConfirmationState := stEventEntryTemp.eConfirmationState;
+	stEventEntryTemp.stAlarmLog.eSeverity := stEventEntryTemp.eSeverity;
+	stEventEntryTemp.stAlarmLog.EventClassName := stEventEntryTemp.EventClassName;
+	stEventEntryTemp.stAlarmLog.sSourceName := stEventEntryTemp.sSourceName;
+	stEventEntryTemp.stAlarmLog.sText := stEventEntryTemp.sText;
+	stEventEntryTemp.stAlarmLog.sTimestamp := REPLACE(STR1:= stEventEntryTemp.stAlarmLog.sTimestamp, STR2 := ' ',L := 1, P := 11);
+            
+	IF TestandSet(bEventEntryTableTestandSet) THEN
+		SUCCEEDED(Insert(stEventEntryTable := stEventEntryTemp));
+
+		UpdateLegacyTable();
+
+		nStep := E_AlarmMessage.Done;
+
+		bEventEntryTableTestandSet := FALSE;
+	END_IF
+END_IF
+
+// CASE: Done   
+IF nStep = E_AlarmMessage.Done THEN
+	OnAlarmRaised := S_OK;
+	nStep := E_AlarmMessage.RequestText;
+	MEMSET(destAddr:= ADR(stEventEntryTemp), fillByte := 16#00 , n:= SIZEOF(stEventEntryTemp)); 
+END_IF     
+
+// Fast Case of nStepRequestText
+// CASE: RequestText   
+IF nStepRequestText = E_AlarmMessage.RequestText THEN
+	fbRequestText.Request(eventClass:=fbEvent.EventClass, nEventId:=fbEvent.nEventId, nLangId:=LangId, ipArgs:=fbEvent.ipArguments );
+	nStepRequestText := E_AlarmMessage.ReceiveText; 
+END_IF
+// CASE: ReceiveText   
+IF nStepRequestText = E_AlarmMessage.ReceiveText THEN
+	IF NOT fbRequestText.bBusy AND NOT fbRequestText.bError THEN
+		fbRequestText.GetString(UTF8, SIZEOF(UTF8));
+		UTF8_TO_STRING(pDstSTRING:=ADR(stEventEntryTemp.sText) , pSrcUTF8:=ADR(UTF8) , nDstSize:=SIZEOF(stEventEntryTemp.sText) , nDstLen=> );
+		nStepRequestText := E_AlarmMessage.Done;
+	ELSIF fbRequestText.bError THEN 
+		nStepRequestText := E_AlarmMessage.RequestText;
+	END_IF 
+END_IF
+ 
+// Fast Case of nStepRequestClass
+// CASE: RequestText   
+IF nStepRequestClass = E_AlarmMessage.RequestText THEN
+	fbRequestClassName.Request(eventClass:=fbEvent.EventClass, nLangId:=LangId,);
+	nStepRequestClass := E_AlarmMessage.ReceiveText;
+END_IF
+// CASE: ReceiveText   
+IF nStepRequestClass = E_AlarmMessage.ReceiveText THEN
+	IF NOT fbRequestClassName.bBusy AND NOT fbRequestClassName.bError THEN
+		fbRequestClassName.GetString(UTF8, SIZEOF(UTF8));
+		UTF8_TO_STRING(pDstSTRING:=ADR(stEventEntryTemp.EventClassName) , pSrcUTF8:=ADR(UTF8) , nDstSize:=SIZEOF(stEventEntryTemp.EventClassName) , nDstLen=> );
+		nStepRequestClass := E_AlarmMessage.Done;
+	ELSIF fbRequestClassName.bError THEN 
+		nStepRequestClass := E_AlarmMessage.RequestText;
+	END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="OnMessageSent" Id="{ab396b77-70ba-4f18-96ae-e7cee29f0731}">
+      <Declaration><![CDATA[METHOD OnMessageSent : HRESULT
+VAR_INPUT
+	fbEvent : REFERENCE TO FB_TcEvent;
+END_VAR
+VAR
+    hr : HRESULT;
+    UTF8 : STRING(255);
+END_VAR
+VAR_INST
+    {attribute 'no_copy'}
+    fbRequestText : FB_RequestEventText;
+    {attribute 'no_copy'}
+    fbRequestClassName : FB_RequestEventClassName;
+END_VAR
+VAR_INST
+    stEventEntryTemp: ST_EventEntryTableListener;
+END_VAR
+VAR_INST
+    nStep : E_AlarmMessage;
+    nStepRequestText : E_AlarmMessage := E_AlarmMessage.Done;
+    nStepRequestClass : E_AlarmMessage := E_AlarmMessage.Done;
+END_VAR
+VAR_INST
+    nCyclesPerMessage : UINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IF NOT __ISVALIDREF(fbEvent) THEN
+	RETURN;
+ELSE
+    OnMessageSent := E_FAIL;	// in order to receive more callbacks (Set <> S_OK in order to cancel the callbacks for this program cycle.)
+    IF bChangeLanguageInterlock THEN
+		RETURN;
+    END_IF    
+END_IF
+
+// Fast Case of nStep
+// CASE: E_AlarmMessage.RequestText
+nCyclesPerMessage := nCyclesPerMessage + 1;
+    IF nStep = E_AlarmMessage.RequestText THEN
+        nStepRequestText := E_AlarmMessage.RequestText;
+        nStepRequestClass := E_AlarmMessage.RequestText;
+        nStep := E_AlarmMessage.ReceiveText;
+	END_IF
+    // CASE: E_AlarmMessage.ReceiveText
+    IF nStep = E_AlarmMessage.ReceiveText THEN
+        IF nStepRequestText = E_AlarmMessage.Done AND
+           nStepRequestClass = E_AlarmMessage.Done THEN
+           nStep := E_AlarmMessage.Insert;
+		END_IF
+	END_IF
+    // CASE: E_AlarmMessage.Insert
+    IF nStep = E_AlarmMessage.Insert THEN
+        
+            hr := fbEvent.GetJsonAttribute(stEventEntryTemp.sJsonAttribute, SIZEOF(stEventEntryTemp.sJsonAttribute));
+            stEventEntryTemp.sSourceName := fbEvent.ipSourceInfo.sName;
+            stEventEntryTemp.eSeverity := fbEvent.eSeverity;
+            IF stEventEntryTemp.eSeverity = 0 THEN stEventEntryTemp.sSeverity := 'Verbose';
+            ELSIF stEventEntryTemp.eSeverity = 1 THEN stEventEntryTemp.sSeverity := 'Info';
+            ELSIF stEventEntryTemp.eSeverity = 2 THEN stEventEntryTemp.sSeverity := 'Warning';
+            ELSIF stEventEntryTemp.eSeverity = 3 THEN stEventEntryTemp.sSeverity := 'Error';
+            ELSIF stEventEntryTemp.eSeverity = 4 THEN stEventEntryTemp.sSeverity := 'Critical'; END_IF
+            stEventEntryTemp.EventClass := fbEvent.EventClass;
+            stEventEntryTemp.sTimestamp := SYSTEMTIME_TO_STRING(UlintToSystemTime(fbEvent.nTimestamp, fbGetTimeZoneInformation.tzInfo));
+            stEventEntryTemp.sTimestampLog := stEventEntryTemp.sTimestamp;
+            stEventEntryTemp.nEventId := fbEvent.nEventId;
+            stEventEntryTemp.ipArguments := fbEvent.ipArguments;
+            stEventEntryTemp.eConfirmationState := TcEventConfirmationState.NotRequired;
+            stEventEntryTemp.bIsEvent := TRUE;
+            
+            stEventEntryTemp.stAlarmLog.sTimestamp := stEventEntryTemp.sTimestampLog;      
+            stEventEntryTemp.stAlarmLog.eConfirmationState := stEventEntryTemp.eConfirmationState;
+            stEventEntryTemp.stAlarmLog.eSeverity := stEventEntryTemp.eSeverity;
+            stEventEntryTemp.stAlarmLog.EventClassName := stEventEntryTemp.EventClassName;
+            stEventEntryTemp.stAlarmLog.sSourceName := stEventEntryTemp.sSourceName;
+            stEventEntryTemp.stAlarmLog.sText := stEventEntryTemp.sText;
+            stEventEntryTemp.stAlarmLog.sTimestamp := REPLACE(STR1:= stEventEntryTemp.stAlarmLog.sTimestamp, STR2 := ' ',L := 1, P := 11);
+            
+			IF TestandSet(bEventEntryTableTestandSet) THEN
+            SUCCEEDED(Insert(stEventEntryTable := stEventEntryTemp));
+                            
+            UpdateLegacyTable();
+            
+
+            nStep := E_AlarmMessage.Done;
+
+			bEventEntryTableTestandSet := FALSE;
+			END_IF
+	END_IF
+
+    // CASE: Done   
+    IF nStep = E_AlarmMessage.Done THEN
+            OnMessageSent := S_OK;
+            nStep := E_AlarmMessage.RequestText;
+            MEMSET(destAddr:= ADR(stEventEntryTemp), fillByte := 16#00 , n:= SIZEOF(stEventEntryTemp)); 
+	END_IF     
+
+
+// Fast Case of nStepRequestText
+    // CASE: RequestText   
+    IF nStepRequestText = E_AlarmMessage.RequestText THEN
+        fbRequestText.Request(eventClass:=fbEvent.EventClass, nEventId:=fbEvent.nEventId, nLangId:=LangId, ipArgs:=fbEvent.ipArguments );
+        nStepRequestText := E_AlarmMessage.ReceiveText; 
+	END_IF
+    // CASE: ReceiveText   
+    IF nStepRequestText = E_AlarmMessage.ReceiveText THEN
+        IF NOT fbRequestText.bBusy AND NOT fbRequestText.bError THEN
+            fbRequestText.GetString(UTF8, SIZEOF(UTF8));
+            UTF8_TO_STRING(pDstSTRING:=ADR(stEventEntryTemp.sText) , pSrcUTF8:=ADR(UTF8) , nDstSize:=SIZEOF(stEventEntryTemp.sText) , nDstLen=> );
+            nStepRequestText := E_AlarmMessage.Done;
+        ELSIF fbRequestText.bError THEN 
+            nStepRequestText := E_AlarmMessage.RequestText;
+        END_IF 
+	END_IF
+ 
+// Fast Case of nStepRequestClass
+    // CASE: RequestText   
+    IF nStepRequestClass = E_AlarmMessage.RequestText THEN
+        fbRequestClassName.Request(eventClass:=fbEvent.EventClass, nLangId:=LangId,);
+        nStepRequestClass := E_AlarmMessage.ReceiveText;
+	END_IF
+    // CASE: ReceiveText   
+    IF nStepRequestClass = E_AlarmMessage.ReceiveText THEN
+        IF NOT fbRequestClassName.bBusy AND NOT fbRequestClassName.bError THEN
+            fbRequestClassName.GetString(UTF8, SIZEOF(UTF8));
+            UTF8_TO_STRING(pDstSTRING:=ADR(stEventEntryTemp.EventClassName) , pSrcUTF8:=ADR(UTF8) , nDstSize:=SIZEOF(stEventEntryTemp.EventClassName) , nDstLen=> );
+            nStepRequestClass := E_AlarmMessage.Done;
+        ELSIF fbRequestClassName.bError THEN 
+            nStepRequestClass := E_AlarmMessage.RequestText;
+        END_IF
+	END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="SeverestAlarmEntryTable" Id="{44da6266-9ea5-4286-808d-27e26d34ee0b}">
+      <Declaration><![CDATA[PROPERTY PUBLIC SeverestAlarmEntryTable : ST_EventEntryTableListener]]></Declaration>
+      <Get Name="Get" Id="{045dea27-ab05-49f0-9486-8a8280c0e233}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[SeverestAlarmEntryTable := stSeverestAlarmEntryTable;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="UlintToSystemTime" Id="{4943717a-b207-46a1-bf05-f661c95a60e7}">
+      <Declaration><![CDATA[METHOD PRIVATE UlintToSystemTime : TIMESTRUCT
+VAR_INPUT
+	_fileTime: ULINT;
+	_tzInfo: ST_TimeZoneInformation;
+END_VAR
+VAR
+	tfileTime: T_FILETIME;
+	tfileTimeZone: T_FILETIME;
+	fbFileTimeToTzSpecificLocalTime: FB_FileTimeToTzSpecificLocalTime;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[MEMCPY(ADR(tfileTime),ADR(_fileTime), SIZEOF(T_FILETIME));
+fbFileTimeToTzSpecificLocalTime(
+	in:= tfileTime, 
+	tzInfo:= _tzInfo, 
+	out=> tfileTimeZone, 
+	eTzID=> , 
+	bB=> );
+UlintToSystemTime := FILETIME_TO_SYSTEMTIME(fileTime:= tfileTimeZone);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="UpdateLegacyTable" Id="{407a717f-c936-4409-a463-439cc82455b9}">
+      <Declaration><![CDATA[METHOD PRIVATE UpdateLegacyTable : HRESULT
+VAR
+    i : DINT;
+END_VAR
+(* Class
+0 None
+1 Maintenance
+2 Message
+3 Hint
+4 Information
+5 Instruction
+6 Warning
+8 Parameter Error
+
+Confirmation State
+0 None
+1 To Be Confirmed
+2 None
+3 Confirmation not needet
+4 Confirmed
+5 None
+
+ResetState
+0 None
+1 RedExclamationMark
+2 GreenFlag
+3 Question Mark
+4 None *)]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+FOR i := 1 TO TO_DINT(MIN(80,Parameter.nMaxEventEntries)) BY 1 DO
+
+	// Severity
+	CASE aEventEntryTable[i-1].eSeverity OF 
+		TcEventSeverity.Verbose :
+			aEvents[i].nClass := 0;
+		TcEventSeverity.Info :
+			aEvents[i].nClass := 4;
+		TcEventSeverity.Warning :
+			aEvents[i].nClass := 6; 
+		TcEventSeverity.Error :
+			aEvents[i].nClass := 7;
+		TcEventSeverity.Critical :
+			aEvents[i].nClass := 7;  
+	END_CASE
+
+	// state of confirmation and reset
+	 CASE aEventEntryTable[i-1].eConfirmationState OF 
+		TcEventConfirmationState.NotSupported :
+			aEvents[i].nConfirmState := 0;
+			aEvents[i].nResetState := 0;
+			
+		TcEventConfirmationState.NotRequired :
+			aEvents[i].nConfirmState := 3;
+			aEvents[i].nResetState := 0;
+			
+		TcEventConfirmationState.WaitForConfirmation :
+			aEvents[i].nConfirmState := 1;
+			aEvents[i].nResetState := 1;
+
+		TcEventConfirmationState.Confirmed :
+			aEvents[i].nConfirmState := 4;
+			aEvents[i].nResetState := 3;
+			
+		TcEventConfirmationState.Reset :
+			aEvents[i].nConfirmState := 0;
+			aEvents[i].nResetState := 3;  
+	END_CASE
+  
+	// rest of data
+	aEvents[i].nEventId := aEventEntryTable[i-1].nEventId;
+	aEvents[i].sComputer := aEventEntryTable[i-1].EventClassName;
+	aEvents[i].sDate := LEFT( aEventEntryTable[i-1].sTimestamp, 10 );
+	aEvents[i].sMessageText := aEventEntryTable[i-1].sText;
+	aEvents[i].sSource := aEventEntryTable[i-1].sSourceName;
+	aEvents[i].nSourceId := aEventEntryTable[i-1].nSourceId;
+	aEvents[i].sTime := LEFT( DELETE( aEventEntryTable[i-1].sTimestamp, 11, 1 ), 8 );
+	
+ END_FOR
+ ]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

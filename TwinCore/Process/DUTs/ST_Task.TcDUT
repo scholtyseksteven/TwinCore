@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <DUT Name="ST_Task" Id="{91d1fea8-38fa-447d-932a-8c630def9b3b}">
+    <Declaration><![CDATA[TYPE ST_Task :
+STRUCT
+	Enabled		: BOOL := FALSE;	// false if not existing
+	Released	: BOOL;	// free to start this task
+	Busy		: BOOL;	// task started
+	Finished	: BOOL;	// also TRUE, when all Tasks are disabled
+	OK			: BOOL;
+	NOK			: BOOL;
+	ManualOK	: BOOL;
+	ManualNOK	: BOOL;
+	State		: USINT;	// lamp HMI
+	(*	State
+		0 - not existing
+		1 - existing/enabled, but not released
+		2 - enabled and released, ready to process
+		3 - processing, process started
+		4 - OK
+		5 - NOK
+		6 - ManualOK
+		7 - ManualNOK
+	*)
+	_groupID	: USINT := 0;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

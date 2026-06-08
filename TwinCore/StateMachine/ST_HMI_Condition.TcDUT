@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <DUT Name="ST_HMI_Condition" Id="{a6527728-c989-4804-81d8-a8c7a9d81610}">
+    <Declaration><![CDATA[TYPE ST_HMI_Condition :
+STRUCT
+	xState	: BOOL := TRUE;
+	sName	: STRING(26) := '';
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

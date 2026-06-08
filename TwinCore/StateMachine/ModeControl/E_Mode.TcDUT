@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <DUT Name="E_Mode" Id="{6e92a0a3-fc4f-40c6-a74a-32a52daf3099}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+TYPE E_Mode :
+(
+	Error := -1,
+	Idle := 0,
+	Stopped,	// Manual Control
+	Stopping,
+	Aborting,
+	Aborted,
+	Starting,
+	Hold,
+	Homing,
+	Clearing,
+	Resetting,
+	Standby,	// Automatic
+	Execute	// Automatic
+);
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

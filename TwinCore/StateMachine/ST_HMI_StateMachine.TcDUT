@@ -1,0 +1,32 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <DUT Name="ST_HMI_StateMachine" Id="{53f5cb02-bbc9-4327-93a8-d763739bcff6}">
+    <Declaration><![CDATA[TYPE ST_HMI_StateMachine :
+STRUCT
+	// name of state machine
+	sName				: STRING;	
+
+	// current state
+	nState				: INT;
+	nNextState			: INT;	// prepared next state
+	sState				: STRING;
+	
+	// conditions
+	stSwitchCondition	: ARRAY[0..Parameter.NUM_CON] OF ST_HMI_Condition;
+	stStateCondition	: ARRAY[0..Parameter.NUM_CON] OF ST_HMI_Condition;
+	
+	nSwitchOrSection	: INT;	// current or section
+	bShowOrSection		: BOOL;	// show or section elements
+	bShowNextState		: BOOL;	// show next state
+	bSwitchOrSectionDec	: BOOL;	// decrement
+	bSwitchOrSectionInc	: BOOL;	// increment
+	bStepMode			: BOOL;
+	bStepNext			: BOOL;
+	
+	// Log
+	stStateHistory		: ARRAY[0..Parameter.HISTORY_SIZE] OF ST_StateMachine_State;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

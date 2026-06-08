@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <Itf Name="I_CONCAT" Id="{fd0fa5ba-41e4-44ca-8567-74b74c2a3289}">
+    <Declaration><![CDATA[INTERFACE I_CONCAT
+]]></Declaration>
+    <Method Name="AddString" Id="{7deb3e29-e3aa-4bb3-9a38-781df1204352}">
+      <Declaration><![CDATA[METHOD AddString : I_CONCAT
+VAR_INPUT
+	pSrcString	: ANY_STRING;
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="AddStringInput" Id="{9c838e5e-05c6-4d3a-b11a-41b80b90d609}">
+      <Declaration><![CDATA[METHOD AddStringInput : I_CONCAT
+VAR_INPUT
+	in:	STRING;
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="Get" Id="{3667ffad-c6c3-49f7-93b6-ffbd21e38a12}">
+      <Declaration><![CDATA[METHOD PUBLIC Get : T_MAXSTRING
+VAR_INPUT
+END_VAR
+]]></Declaration>
+    </Method>
+  </Itf>
+</TcPlcObject>

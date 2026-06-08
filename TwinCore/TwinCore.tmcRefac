@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Refactors>
+  <Renames>
+    <RenamedType>
+      <Type guid="183d757d-b482-4f1e-ad9b-b6abe04de0db">FB_BLINKER_1</Type>
+      <From>FB_Blinker_1</From>
+      <To>FB_Blinker_PWM</To>
+    </RenamedType>
+    <RenamedType>
+      <Type guid="1cff20aa-679b-4e2a-934b-b7c49cba3a98">FB_LISTNUMBERS_1</Type>
+      <From>FB_ListNumbers_1</From>
+      <To>FB_ListNumbers_REAL</To>
+    </RenamedType>
+    <RenamedType>
+      <Type guid="92e38839-df67-4137-87b1-1fac7451859a">FB_LISTNUMBERS</Type>
+      <From>FB_ListNumbers</From>
+      <To>FB_ListNumbers_DINT</To>
+    </RenamedType>
+  </Renames>
+</Refactors>

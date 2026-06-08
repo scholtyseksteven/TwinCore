@@ -1,0 +1,644 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <POU Name="FB_Alarm" Id="{9ad75833-ec6e-4f0e-b6e0-1de1dd98cb7a}" SpecialFunc="None">
+    <Declaration><![CDATA[//Usage description
+//-----------------
+//| This FB uses the FB_init, which needs to be initialized within the declaration!
+//| Also it can use the method Initialization, to specify Group/Zone IDs of the Event. Here you can also change the alarm reaction
+//| use SetEvent[...] -methods to raise an alarm!
+//| 
+//| You can trigger an alarm once or use it cyclically.
+//| The :ref:`FB_AlarmManagement` prevent acknowledge automatically if SetAlarm is still set.
+FUNCTION_BLOCK FB_Alarm IMPLEMENTS I_Alarm
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+	sText		: STRING := '';
+	sClassName	: STRING := '';
+	sTimeRaised	: STRING := '';
+	nGroupId	: UINT;
+	nZoneId		: UINT;
+END_VAR
+VAR
+	_bSetEvent				: BOOL;
+	_bBlockAck				: BOOL;
+	_bWithConfirmation		: BOOL;
+	fbTcAlarm				: FB_TcAlarm;
+	_fbInternalSourceInfo	: Tc3_EventLogger.FB_TcSourceInfo;	// needed to have "multi-instances" of EventClass in CreateEx()
+	nLangId					: INT;
+	
+    fbRequestText : FB_RequestEventText;
+    fbRequestClassName : FB_RequestEventClassName;
+	
+	_stEventClass	: TcEventEntry;
+	_eEventReaction	: E_AlarmReaction;
+	_nInterfaceIndex: UINT;
+	_nArgumentCount: UDINT;
+	
+	hrRaise	: HRESULT;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="Implicit" Id="{4843c30d-fd2f-4320-b66e-dc0779dc33de}" />
+    <Folder Name="Properties" Id="{4d9a9e82-60b1-4eed-a3e7-6dcb1f955fae}" />
+    <Folder Name="Standard" Id="{97593be8-8252-420b-8b64-6f7510127df7}" />
+    <Method Name="Ack" Id="{3bb8880a-1258-4d53-a05a-4ee5e82110b2}" FolderPath="Standard\">
+      <Declaration><![CDATA[METHOD Ack : HRESULT
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IF NOT _bBlockAck AND_THEN THIS^.bActive THEN
+	Ack := THIS^.fbTcAlarm.Clear( 0, FALSE );
+ELSE
+	Ack := 1;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="AddArgument" Id="{00329942-543f-413c-8c60-b737a3dcc752}">
+      <Declaration><![CDATA[METHOD PUBLIC AddArgument : REFERENCE TO FB_Alarm
+VAR_INPUT
+	sName	: STRING;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+THIS^.fbTcAlarm.ipArguments.AddString( sName );
+addArgument REF= THIS^;
+_nArgumentCount := _nArgumentCount + 1;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="bActive" Id="{9d4d201b-1ccf-46ee-a2b9-d8ce62d603f3}" FolderPath="Properties\">
+      <Declaration><![CDATA[// Returns TRUE if the alarm is in the "Raised" or "Wait For Confirmation" state.
+PROPERTY bActive : BOOL]]></Declaration>
+      <Get Name="Get" Id="{8b3af9df-3c09-453f-b6a2-6032f1f9c8c9}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[bActive := THIS^.fbTcAlarm.bActive OR _bSetEvent;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="bBlockAck" Id="{aa8b855e-e68b-4b1a-be08-22ac36fa8d7d}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY PUBLIC bBlockAck : BOOL]]></Declaration>
+      <Get Name="Get" Id="{9c5628d3-a617-4acf-9a33-efa3c6cd866b}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[bBlockAck := _bBlockAck;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{ac7b94ed-ca72-4472-86a4-5f25a5323279}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_bBlockAck := bBlockAck;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="bRaised" Id="{47e555ea-c662-4a7b-bbf4-beca16d93cad}" FolderPath="Properties\">
+      <Declaration><![CDATA[// Returns TRUE if the alarm is in the "raised" state.
+PROPERTY bRaised : BOOL]]></Declaration>
+      <Get Name="Get" Id="{24ae81eb-13c9-4ab9-a157-d609fe2d9d34}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[bRaised := THIS^.fbTcAlarm.bRaised;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="bSetEvent" Id="{2ff00c82-6ff6-40a1-af11-253abe70ebed}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY PUBLIC bSetEvent : BOOL]]></Declaration>
+      <Get Name="Get" Id="{f84f871f-b382-43a9-a223-0d08f4b76a00}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[bSetEvent := _bSetEvent;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{65160bb8-1127-40bc-b45f-063fc221d635}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_bSetEvent := bSetEvent;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="Clear" Id="{b4598298-7436-4f69-a19e-439a37d7111c}" FolderPath="Standard\">
+      <Declaration><![CDATA[METHOD Clear : HRESULT
+VAR_INPUT
+	nTimeStamp			: ULINT;
+	bResetConfirmation	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IF NOT _bSetEvent AND_THEN THIS^.bActive THEN
+	Clear := THIS^.fbTcAlarm.Clear( nTimeStamp, bResetConfirmation );
+ELSE
+	Clear := 1;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="eEventReaction" Id="{88a17816-ee61-481d-b730-395301c5eb6a}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY PUBLIC eEventReaction : E_AlarmReaction]]></Declaration>
+      <Get Name="Get" Id="{982905fd-5194-4730-9c87-2fcf344c5825}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[eEventReaction := _eEventReaction;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{b06e1564-761c-4220-bcbd-7ae34fa7eb1e}">
+        <Declaration><![CDATA[PUBLIC 
+VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_eEventReaction := eEventReaction;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="eSeverity" Id="{c18fa12c-43c3-4cdb-8704-8a07e84481c9}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY eSeverity : TcEventSeverity]]></Declaration>
+      <Get Name="Get" Id="{9974c6d4-c9ed-4703-8857-c8d75d0a160f}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[eSeverity := THIS^.fbTcAlarm.eSeverity;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="FB_exit" Id="{b010e223-03dd-4125-a4b4-ddc07a5a79e9}" FolderPath="Implicit\">
+      <Declaration><![CDATA[METHOD FB_exit : BOOL
+VAR_INPUT
+	bInCopyCode : BOOL;  // if TRUE, the instance afterwards gets moved into the copy code (online change)
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT bInCopyCode THEN
+	THIS^.fbTcAlarm.ipArguments.Clear();
+	THIS^.fbTcAlarm.Release();
+	GVL_Diag.gipAlarm[_nInterfaceIndex] := 0;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_init" Id="{627e0ae0-1633-4d21-88ee-b0f72da5a7db}" FolderPath="Implicit\">
+      <Declaration><![CDATA[METHOD FB_init : BOOL
+VAR_INPUT
+	bInitRetains : BOOL; // if TRUE, the retain variables are initialized (warm start / cold start)
+	bInCopyCode : BOOL;  // if TRUE, the instance afterwards gets moved into the copy code (online change)
+	
+	stTmpEventClass	: TcEventEntry;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+// no online-change
+IF NOT bInCopyCode THEN
+	
+	// detect config error, if too many events were created during initializing
+	IF GVL_Diag.gnCountAlarms >= Parameter.nMaxNumberAlarms THEN
+		GVL_Diag.gbCountAlarmsMaxExceeded := TRUE;
+	ELSE
+		_stEventClass := stTmpEventClass;
+		// standard event reaction depending of the event class severity
+		CASE _stEventClass.eSeverity OF
+			TcEventSeverity.Critical:
+				_eEventReaction := E_AlarmReaction.MediaOff;
+			TcEventSeverity.Error:
+				_eEventReaction := E_AlarmReaction.AbortAll;
+			TcEventSeverity.Warning:
+				_eEventReaction := E_AlarmReaction.Warning;
+			TcEventSeverity.Info:
+				_eEventReaction := E_AlarmReaction.Info;
+			TcEventSeverity.Verbose:
+				_eEventReaction := E_AlarmReaction.Verbose;
+		END_CASE
+		
+		{warning 'TODO: Understanding of Confirmation System'}
+		// _bWithConfirmation := SEL( _stEventClass.eSeverity = TcEventSeverity.Error OR _stEventClass.eSeverity = TcEventSeverity.Critical, FALSE, TRUE);
+		_bWithConfirmation := FALSE;
+		
+		THIS^.fbTcAlarm.CreateEx(
+			_stEventClass,
+			_bWithConfirmation,
+			THIS^._fbInternalSourceInfo );
+		
+		GVL_Diag.gipAlarm[GVL_Diag.gnCountAlarms] := THIS^;
+		
+		_nInterfaceIndex := GVL_Diag.gnCountAlarms;
+		GVL_Diag.gnCountAlarms := GVL_Diag.gnCountAlarms + 1;
+		
+	END_IF
+	
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="GetEventEntry" Id="{86d82901-5718-4b2a-a118-c465ead0d321}">
+      <Declaration><![CDATA[METHOD GetEventEntry : ST_EventEntryTable
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+GetEventEntry.sText := THIS^.sText;
+GetEventEntry.sSourceName := THIS^.fbTcAlarm.ipSourceInfo.sName;
+GetEventEntry.nSourceId := THIS^.fbTcAlarm.ipSourceInfo.nId;
+GetEventEntry.nGroupId := THIS^.nGroupId;
+
+GetEventEntry.sTimestamp := THIS^.sTimeRaised;
+
+GetEventEntry.eSeverity := THIS^.fbTcAlarm.eSeverity;
+CASE THIS^.fbTcAlarm.eSeverity OF
+	TcEventSeverity.Verbose:	GetEventEntry.sSeverity := 'Verbose';
+	TcEventSeverity.Info:		GetEventEntry.sSeverity := 'Info';
+	TcEventSeverity.Warning:	GetEventEntry.sSeverity := 'Warning';
+	TcEventSeverity.Error:		GetEventEntry.sSeverity := 'Error';
+	TcEventSeverity.Critical:	GetEventEntry.sSeverity := 'Critical';
+	ELSE	GetEventEntry.sSeverity := 'None';
+END_CASE
+
+CASE _eEventReaction OF
+	E_AlarmReaction.AbortAll:	GetEventEntry.sReaction := 'Abort All';
+	E_AlarmReaction.AbortGroup:	GetEventEntry.sReaction := 'Abort Group';
+	E_AlarmReaction.Info:		GetEventEntry.sReaction := 'Info';
+	E_AlarmReaction.MediaOff:	GetEventEntry.sReaction := 'Media Off';
+	E_AlarmReaction.None:		GetEventEntry.sReaction := 'None';
+	E_AlarmReaction.StopAtCycleEnd:	GetEventEntry.sReaction := 'StopAtCycleEnd';
+	E_AlarmReaction.Verbose:	GetEventEntry.sReaction := 'Verbose';
+	E_AlarmReaction.Warning:	GetEventEntry.sReaction := 'Warning';
+	ELSE	GetEventEntry.sReaction := 'None';
+END_CASE
+
+GetEventEntry.EventClass := THIS^.fbTcAlarm.EventClass;
+GetEventEntry.EventClassName := THIS^.sClassName;
+
+GetEventEntry.nEventId := THIS^.fbTcAlarm.nEventId;
+// GetEventEntry.ipArguments := fbTcAlarm.ipArguments;
+GetEventEntry.eConfirmationState := THIS^.fbTcAlarm.eConfirmationState;
+GetEventEntry.bIsAlarm := TRUE;
+GetEventEntry.bIsEvent := FALSE;
+
+GetEventEntry.nLanguageId := THIS^.nLangId;
+
+(*
+	sJsonAttribute: STRING(8000);
+#	sText: STRING(255); // 
+#	sSourceName: STRING(255); // 
+#	nSourceId: UDINT; // 
+	sDescription: STRING(255);
+#	eSeverity: TcEventSeverity; // INT
+#	sSeverity: STRING;
+#	EventClass: GUID;
+#	EventClassName: STRING(255); //
+	sTimestampLog : STRING;
+	sTimestamp: STRING; // 
+	sTimestampConfirmed: STRING;
+	sTimestampCleared: STRING;
+#	nEventId: UDINT;
+#	ipArguments: I_TcArguments;
+#	eConfirmationState: TcEventConfirmationState; // 
+	bTextReceived: BOOL;
+#	bIsAlarm: BOOL;
+#	bIsEvent: BOOL;
+	stAlarmLog : ST_AlarmLog;
+	bLogged : BOOL;
+#	nLanguageId : INT;
+*)
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="GetEventText" Id="{d5de04b7-7955-4bec-9baf-128389b6ad92}">
+      <Declaration><![CDATA[METHOD GetEventText : BOOL
+VAR_INPUT
+END_VAR
+VAR_INST
+	bReqTextError	: BOOL;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+GetEventText := FALSE;
+
+IF THIS^.fbTcAlarm.RequestEventText(
+	nLangId		:= 1031,
+	sResult		:= sText,
+	nResultSize	:= SIZEOF( sText ),
+	bError		=> bReqTextError
+) THEN
+	GetEventText := TRUE;
+END_IF
+
+IF bReqTextError THEN
+	sText := '';
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="GetJsonAttribute" Id="{64e6db7c-ccf7-411e-8493-d8362169fd96}">
+      <Declaration><![CDATA[METHOD GetJsonAttribute : HRESULT
+VAR_INPUT
+	sJsonAttribute	: REFERENCE TO STRING;
+	nJsonAttribute	: UDINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+THIS^.fbTcAlarm.GetJsonAttribute( sJsonAttribute, nJsonAttribute );
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Initialize" Id="{ef083003-4def-4286-83a8-cdc0990f6207}" FolderPath="Standard\">
+      <Declaration><![CDATA[METHOD PUBLIC Initialize : HRESULT
+VAR_INPUT
+	nTmpZoneId			: UINT;
+	nTmpGroupId			: UINT;
+	eInEventReaction	: E_AlarmReaction;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+THIS^.nZoneId := nTmpZoneId;
+THIS^.nGroupId := nTmpGroupId;
+THIS^._eEventReaction := eInEventReaction;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="ipArguments" Id="{746ff955-35e4-4b9c-97c8-5322868af6b6}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY PUBLIC ipArguments : I_TcArguments]]></Declaration>
+      <Get Name="Get" Id="{85c832b7-3ca6-46e4-9903-ac56e4561bc3}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ipArguments := THIS^.fbTcAlarm.ipArguments;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="LogEntry" Id="{1fd9fc8e-f219-43b0-a85b-d2d1da1f2112}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY PUBLIC LogEntry : ST_LogEntry]]></Declaration>
+      <Get Name="Get" Id="{e6363fc4-d791-4b4a-94b7-0653e47c3974}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[
+LogEntry.sText := sText;
+LogEntry.sTimestampLog := sTimeRaised;
+LogEntry.sSeverity := THIS^.sSeverity;
+LogEntry.sSourceName := THIS^._fbInternalSourceInfo.sName;
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="nGetGroupId" Id="{be025076-de71-4196-a21d-0968a6d7dd60}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY PUBLIC nGetGroupId : UINT]]></Declaration>
+      <Get Name="Get" Id="{2f228995-1fac-45e8-acbd-0b81907c6bc1}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[nGetGroupId := nGroupId;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="nGetSourceId" Id="{c8afe8f5-7bd7-4b1d-9cc2-ca45eef1d5ac}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY PUBLIC nGetSourceId : UDINT]]></Declaration>
+      <Get Name="Get" Id="{77cc0182-b484-4deb-bd81-5599540df57d}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[nGetSourceId := THIS^.fbTcAlarm.ipSourceInfo.nId;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="Raise" Id="{6470e96b-a3db-46e2-8780-266856f82011}" FolderPath="Standard\">
+      <Declaration><![CDATA[METHOD Raise : HRESULT
+VAR_INPUT
+	nTimeStamp	: ULINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.fbTcAlarm.Raise( 0 );
+
+THIS^.sTimeRaised := SYSTEMTIME_TO_STRING(
+	UlintToSystemTime(
+		THIS^.fbTcAlarm.nTimeRaised,
+		GVL_Diag.gfbAlarmManagement.fbGetTimeZoneInformation.tzInfo ) );
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SetEvent" Id="{7b73aac3-bfee-4830-89bc-1f3cab7b52b5}">
+      <Declaration><![CDATA[METHOD PUBLIC SetEvent : REFERENCE TO FB_Alarm
+VAR_INPUT
+	bSetEvent	: BOOL;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IF bSetEvent
+AND_THEN NOT THIS^._bSetEvent
+AND_THEN NOT THIS^.bActive THEN
+	hrRaise := THIS^.Raise( 0 );
+	GVL_Diag.gfbLogFile.addEntry( THIS^ );
+END_IF
+_bSetEvent := bSetEvent;
+_bBlockAck S= bSetEvent;
+
+setEvent REF= THIS^;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SetEventWithOneArgument" Id="{dc7cd21d-e80f-44dd-aac7-a425847ab236}">
+      <Declaration><![CDATA[METHOD PUBLIC SetEventWithOneArgument : REFERENCE TO FB_Alarm
+VAR_INPUT
+	bSetEvent		: BOOL;
+	sInName			: STRING;
+END_VAR
+VAR_INST
+	rtSetEvent		: R_TRIG;
+END_VAR
+VAR
+    hr		: HRESULT;
+    UTF8	: STRING(255);
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IF bSetEvent
+AND_THEN NOT THIS^._bSetEvent
+AND_THEN NOT THIS^.bActive THEN
+	THIS^.start().addArgument( sInName );
+	hrRaise := THIS^.Raise( 0 );
+	GVL_Diag.gfbLogFile.addEntry( THIS^ );
+END_IF
+_bSetEvent := bSetEvent;
+_bBlockAck S= _bSetEvent;
+
+setEventWithOneArgument REF= THIS^;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="sSeverity" Id="{d166d5e9-91a1-41b1-875f-14acbe7ffbf3}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY PRIVATE sSeverity : STRING]]></Declaration>
+      <Get Name="Get" Id="{cb2eb32b-fbba-4c63-992d-00d6485af167}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[
+CASE fbTcAlarm.eSeverity OF
+	
+	TcEventSeverity.Critical:
+		sSeverity := 'Critical';
+		
+	TcEventSeverity.Error:
+		sSeverity := 'Error';
+		
+	TcEventSeverity.Info:
+		sSeverity := 'Info';
+		
+	TcEventSeverity.Verbose:
+		sSeverity := 'Verbose';
+		
+	TcEventSeverity.Warning:
+		sSeverity := 'Warning';
+		
+	ELSE
+		sSeverity := 'None';
+		
+END_CASE]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="Start" Id="{264f7d19-2693-416a-8849-25de27f2ef54}">
+      <Declaration><![CDATA[METHOD PUBLIC Start : REFERENCE TO FB_Alarm
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+THIS^.fbTcAlarm.ipArguments.Clear();
+start REF= THIS^;
+_nArgumentCount := 0;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="UlintToSystemTime" Id="{06bd5ce3-e913-489a-afdd-d3fe66927e82}">
+      <Declaration><![CDATA[METHOD PRIVATE UlintToSystemTime : TIMESTRUCT
+VAR_INPUT
+	_fileTime: ULINT;
+	_tzInfo: ST_TimeZoneInformation;
+END_VAR
+VAR
+	tfileTime: T_FILETIME;
+	tfileTimeZone: T_FILETIME;
+	fbFileTimeToTzSpecificLocalTime: FB_FileTimeToTzSpecificLocalTime;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+MEMCPY( ADR( tfileTime ),ADR( _fileTime ), SIZEOF( T_FILETIME ) );
+fbFileTimeToTzSpecificLocalTime(
+	in := tfileTime, 
+	tzInfo := _tzInfo, 
+	out => tfileTimeZone, 
+	eTzID => , 
+	bB => );
+UlintToSystemTime := FILETIME_TO_SYSTEMTIME( fileTime:= tfileTimeZone );
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="UpdateText" Id="{00bc1e94-27b1-406f-914e-3c6c82e8d5ed}">
+      <Declaration><![CDATA[METHOD PUBLIC UpdateText : HRESULT
+VAR_INPUT
+	LangId	: INT;
+END_VAR
+VAR_INST
+    nStep : E_AlarmMessage;
+    nStepRequestText : E_AlarmMessage := E_AlarmMessage.Done;
+    nStepRequestClass : E_AlarmMessage := E_AlarmMessage.Done;
+END_VAR
+VAR
+	
+    hr : HRESULT;
+    UTF8 : STRING(255);
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IF ( nStepRequestText <> E_AlarmMessage.Done
+	OR nStepRequestClass <> E_AlarmMessage.Done )
+AND THIS^.bRaised THEN
+	
+	// CASE: RequestText   
+	IF nStepRequestText = E_AlarmMessage.RequestText THEN
+		THIS^.fbRequestText.Request( eventClass := THIS^.fbTcAlarm.EventClass, nEventId := THIS^.fbTcAlarm.nEventId, nLangId := LangId, ipArgs := THIS^.fbTcAlarm.ipArguments );
+		nStepRequestText := E_AlarmMessage.ReceiveText;
+	END_IF
+	
+	// CASE: ReceiveText   
+	IF nStepRequestText = E_AlarmMessage.ReceiveText THEN
+		IF NOT THIS^.fbRequestText.bBusy AND NOT THIS^.fbRequestText.bError THEN
+			THIS^.fbRequestText.GetString( UTF8, SIZEOF( UTF8 ) );
+			UTF8_TO_STRING(pDstSTRING := ADR( sText ), pSrcUTF8 := ADR( UTF8 ), nDstSize := SIZEOF( sText ), nDstLen => );
+			nStepRequestText := E_AlarmMessage.Done;
+		ELSIF THIS^.fbRequestText.bError THEN 
+			nStepRequestText := E_AlarmMessage.RequestText;
+		END_IF
+	END_IF
+	
+    // CASE: RequestClassText   
+    IF nStepRequestClass = E_AlarmMessage.RequestText THEN
+		THIS^.fbRequestClassName.Request( eventClass := THIS^.fbTcAlarm.EventClass, nLangId := LangId );
+		nStepRequestClass := E_AlarmMessage.ReceiveText;
+	END_IF
+	
+    // CASE: ReceiveClassText   
+    IF nStepRequestClass = E_AlarmMessage.ReceiveText THEN
+        IF NOT THIS^.fbRequestClassName.bBusy AND NOT THIS^.fbRequestClassName.bError THEN
+            THIS^.fbRequestClassName.GetString( UTF8, SIZEOF( UTF8 ) );
+            UTF8_TO_STRING(pDstSTRING:=ADR( sClassName ), pSrcUTF8 := ADR( UTF8 ), nDstSize:=SIZEOF( sClassName ), nDstLen=> );
+            nStepRequestClass := E_AlarmMessage.Done;
+        ELSIF THIS^.fbRequestClassName.bError THEN 
+            nStepRequestClass := E_AlarmMessage.RequestText;
+        END_IF
+	END_IF
+
+ELSE
+	// reset Text
+	IF NOT bRaised OR nLangId <> LangId THEN
+		sText := '';
+		sClassName := '';
+		nStepRequestClass := E_AlarmMessage.RequestText;
+		nStepRequestText := E_AlarmMessage.RequestText;
+		nLangId := LangId;
+	END_IF
+END_IF
+
+IF THIS^.fbRequestClassName.bError
+OR THIS^.fbRequestText.bError THEN
+	UpdateText := E_FAIL;
+ELSIF THIS^.fbRequestClassName.bBusy
+OR THIS^.fbRequestText.bBusy THEN
+	UpdateText := S_OK;
+ELSE
+	UpdateText := S_PENDING;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

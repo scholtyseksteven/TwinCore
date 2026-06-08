@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <DUT Name="E_MachineState" Id="{f0f85627-ffcb-4534-9b4c-a7001ad49863}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+TYPE E_MachineState :
+(
+	Error := -1,
+	Idle := 0,
+	Stopped,	// Manual Control
+	Stopping,
+	Aborting,
+	Aborted,
+	Starting,
+	Execute,	// Automatic
+	Hold,
+	Homing,
+	Clearing,
+	Resetting
+);
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

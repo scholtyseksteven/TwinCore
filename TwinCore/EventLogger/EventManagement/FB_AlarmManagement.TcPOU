@@ -1,0 +1,550 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
+  <POU Name="FB_AlarmManagement" Id="{d0dc2317-916a-4429-b902-8a8f5746e49a}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_AlarmManagement
+VAR_INPUT
+	bInAck			: BOOL;	// Acknowledge all errors, if possible
+END_VAR
+VAR_OUTPUT
+	bError			: BOOL;	// Alarm active with reaction type media off or abort all
+	
+	// MessageReaction
+	bVerbose		: BOOL;	// at least one verbose info is active (not important info)
+	bInfo			: BOOL;	// at least one info is active
+	bWarning		: BOOL;	// at least one warning is active
+	bStopAtCycleEnd	: BOOL;	// at least on alarm needs to stop at cycle end, goes into stop state after ending cycle
+	bAbortGroup		: BOOL;	// aborts one group, detect with method IsAlarmInGroup( GroupID ) or IsAlarmInGroupOfZone( GroupID )
+	bAbortAll		: BOOL;	// abort/stops all groups
+	bMediaOff		: BOOL;	// critical alarm, shuts down media!
+	
+	bAckRequested	: BOOL;	// at least one verbose info is active (not important info)
+	
+    aEventEntryTable: ARRAY[0..Parameter.nMaxEventEntries] OF ST_EventEntryTable;	// to show in HMI
+	
+END_VAR
+VAR
+	bInit	: BOOL := TRUE;
+	
+    nCounter	: UINT;
+
+	rtAck	: R_TRIG;
+	
+	nVisuTableIndex					: UINT;
+	bVisuTableCmdIndexPlus			: BOOL;
+	bVisuTableCmdIndexMinus			: BOOL;
+	bVisuTableDisableCmdIndexPlus	: BOOL;
+	bVisuTableDisableCmdIndexMinus	: BOOL;
+	bVisuTableCmdCleanErrors		: BOOL;
+	
+    nLanguage	: INT := 1031;
+    sLanguage	: STRING := 'de';
+    bChangeLanguage	: BOOL;
+	
+	cfgShowErrors	: BOOL := TRUE;	// including critical
+	cfgShowWarnings	: BOOL := TRUE;
+	cfgShowInfos	: BOOL := TRUE;	// including verbose
+	
+    fbSourceInfo				: FB_TcSourceInfo;
+    fbGetTimeZoneInformation	: FB_GetTimeZoneInformation;
+    stSeverestAlarmEntryTable	: ST_EventEntryTable;
+    stLastEventEntryTable		: ST_EventEntryTable;
+	
+	fbWrnTooManyAlarms			: FB_Alarm( TC_EVENTS.EventClassGeneral.W_TooManyAlarmsDefined );
+	fbErrInterfaceNotAssigned	: FB_Alarm( TC_EVENTS.EventClassGeneral.E_Debug );
+	fbWrnArgumentBeforeInit		: FB_Alarm( TC_EVENTS.EventClassGeneral.W_ArgumentBeforeInit );
+	fbWrnCyclicCallNotDetected	: FB_Alarm( TC_EVENTS.EventClassGeneral.W_CyclicCallNotDetected );
+	{warning 'TODO: realize cyclic call detection'}
+	
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[
+// in case you only want to call the body cyclic.
+Execute( bInAck );
+
+{warning 'TODO: log history of general events! Verbose/Debug'}
+]]></ST>
+    </Implementation>
+    <Folder Name="Checks" Id="{e8725e19-ae7d-4ed1-9a4f-e8a33910e29e}" />
+    <Folder Name="private" Id="{356aaff2-575a-4f7f-8ffd-66940029dc45}" />
+    <Method Name="Execute" Id="{fdf42da4-f9ae-40ca-99ad-0b91463d6b1c}">
+      <Declaration><![CDATA[// cyclic call of Event Management, in case you don't want to use the FB-body!
+METHOD PUBLIC Execute : HRESULT
+VAR_INPUT
+	bInAck			: BOOL;	// Acknowledge all errors, if possible
+END_VAR
+VAR_INST
+    bGetTimeZone : BOOL := TRUE;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+// inititalizing
+IF bInit THEN
+	Initialize();
+END_IF
+
+// trigger of inputs
+rtAck( CLK := bInAck OR bVisuTableCmdCleanErrors );
+bVisuTableCmdCleanErrors R= bVisuTableCmdCleanErrors;
+
+// check if at least one Error is raised, and store alarm reaction type
+initOutputs();
+
+// Update Language
+LanguageId( sLanguage );
+
+// Update event table
+UpdateEventTable();
+
+// HMI
+HMI();
+
+fbGetTimeZoneInformation( bExecute := bGetTimeZone );
+bGetTimeZone R= bGetTimeZone;
+
+// Debug Meldungen 
+fbWrnTooManyAlarms.setEvent( GVL_Diag.gbCountAlarmsMaxExceeded );
+fbErrInterfaceNotAssigned.setEvent( GVL_Diag.gbInterfaceNotAssigned );
+fbWrnArgumentBeforeInit.setEvent( FALSE );
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_exit" Id="{dc9e29a4-a311-4928-9cba-0cf81fa0894b}">
+      <Declaration><![CDATA[METHOD FB_exit : BOOL
+VAR_INPUT
+	bInCopyCode : BOOL; // if TRUE, the exit method is called for exiting an instance that is copied afterwards (online change).
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IF NOT bInCopyCode THEN
+	GVL_Diag.gipAlarm[0] := 0;
+	GVL_Diag.gipAlarm[1] := 0;
+	GVL_Diag.gipAlarm[2] := 0;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="GetEventTable" Id="{f8a1eef6-faab-4a97-ba79-e011e5ad356d}">
+      <Declaration><![CDATA[METHOD PUBLIC GetEventTable : BOOL
+VAR_INPUT
+	nZoneId		: UDINT;	// Zone = 0 is for all zones
+	nGroupId	: UINT;
+	bShowError	: BOOL;	// including criticals
+	bShowWarning: BOOL;
+	bShowInfo	: BOOL;	// including verbose
+END_VAR
+VAR_IN_OUT
+	astEventTable	:	ARRAY[*] OF ST_EventEntryTable;
+END_VAR
+VAR
+	i			: DINT;
+	j			: DINT;
+	nLowerBound	: DINT;
+	nUpperBound	: DINT;
+	EmptyEventTableLine	: ST_EventEntryTable;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+// check bounds
+nLowerBound := LOWER_BOUND( astEventTable, 1 );
+nUpperBound := UPPER_BOUND( astEventTable, 1 );
+j := nLowerBound;
+
+// empty table
+FOR i := nLowerBound TO nUpperBound DO	
+	astEventTable[i] := EmptyEventTableLine;
+END_FOR
+
+// poll the big Event table
+FOR i := 0 TO Parameter.nMaxEventEntries DO
+
+	// check filter settings
+	IF ( nZoneId <> 0 AND aEventEntryTable[i].nZoneId = nZoneId )
+	OR_ELSE ( nGroupId <> 0 AND aEventEntryTable[i].nGroupId = nGroupId )
+	AND_THEN ( ( aEventEntryTable[i].eSeverity = TcEventSeverity.Critical AND bShowError )
+		OR ( aEventEntryTable[i].eSeverity = TcEventSeverity.Error AND bShowError )
+		OR ( aEventEntryTable[i].eSeverity = TcEventSeverity.Warning AND bShowWarning )
+		OR ( aEventEntryTable[i].eSeverity = TcEventSeverity.Info AND bShowInfo )
+		OR ( aEventEntryTable[i].eSeverity = TcEventSeverity.Verbose AND bShowInfo ) )
+	THEN
+		
+		// fill filtered feedback table
+		astEventTable[j] := aEventEntryTable[i];
+		j := j + 1;
+		
+	END_IF
+	
+	// used table is full
+	IF j > nUpperBound THEN
+		RETURN;
+	END_IF
+	
+END_FOR
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HMI" Id="{df059abe-4657-4796-ad40-edb2f993636e}" FolderPath="private\">
+      <Declaration><![CDATA[METHOD PRIVATE HMI : BOOL
+VAR_INST
+    nCounterTemp : DINT;
+    trigVisuIndexingPlus: R_TRIG;
+	trigVisuIndexingMinus: R_TRIG;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IF nCounterTemp <> nCounter THEN
+    nCounterTemp := nCounter;
+    nVisuTableIndex := 0;
+END_IF
+
+bVisuTableDisableCmdIndexPlus := nVisuTableIndex > nCounter - Parameter.nNUM_OF_MESSAGES_VISU
+	OR nCounter <= Parameter.nNUM_OF_MESSAGES_VISU
+	OR nVisuTableIndex >= Parameter.nMaxEventEntries;
+
+bVisuTableDisableCmdIndexMinus := nVisuTableIndex <= 0;
+
+trigVisuIndexingPlus( CLK := bVisuTableCmdIndexPlus );
+IF trigVisuIndexingPlus.Q THEN
+	nVisuTableIndex := nVisuTableIndex + 1;
+END_IF
+
+trigVisuIndexingMinus( CLK := bVisuTableCmdIndexMinus );
+IF trigVisuIndexingMinus.Q THEN
+	nVisuTableIndex := nVisuTableIndex - 1;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Initialize" Id="{64323bd8-ac95-4780-8735-2671c28c244b}" FolderPath="private\">
+      <Declaration><![CDATA[METHOD PRIVATE Initialize : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+fbWrnTooManyAlarms.Initialize( 0, 0, E_AlarmReaction.Warning );
+fbErrInterfaceNotAssigned.Initialize( 0, 0, E_AlarmReaction.AbortAll );
+fbWrnArgumentBeforeInit.Initialize( 0, 0, E_AlarmReaction.Warning );
+
+GVL_Diag.gipAlarm[0] := fbWrnTooManyAlarms;
+GVL_Diag.gipAlarm[1] := fbErrInterfaceNotAssigned;
+GVL_Diag.gipAlarm[2] := fbWrnArgumentBeforeInit;
+
+bInit := FALSE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="initOutputs" Id="{8d91f437-87fb-4425-84e8-585845930a20}" FolderPath="private\">
+      <Declaration><![CDATA[METHOD PRIVATE initOutputs : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+bError			:= FALSE;
+bInfo			:= FALSE;
+bWarning		:= FALSE;
+bVerbose		:= FALSE;
+bStopAtCycleEnd	:= FALSE;
+bAbortGroup		:= FALSE;
+bAbortAll		:= FALSE;
+bMediaOff		:= FALSE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="IsAlarmInGroup" Id="{0f3090cd-a3c3-4ba0-8e2d-2852e5660644}" FolderPath="Checks\">
+      <Declaration><![CDATA[METHOD PUBLIC IsAlarmInGroup : BOOL
+VAR_INPUT
+	nGroupId	: UINT;
+END_VAR
+VAR
+	i	: UINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IsAlarmInGroup := FALSE;
+FOR i := 1 TO GVL_Diag.gnCountAlarms DO
+	
+	// Interface successfully assigned
+	IF GVL_Diag.gipAlarm[i] <> 0
+	AND_THEN GVL_Diag.gipAlarm[i].bActive
+	AND_THEN GVL_Diag.gipAlarm[i].nGetGroupId = nGroupId THEN
+			
+		IsAlarmInGroup := TRUE;
+		
+	END_IF
+	
+END_FOR
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="IsAlarmInGroupOfZone" Id="{e03007a8-fd30-41a9-a61f-2c11055a8faf}" FolderPath="Checks\">
+      <Declaration><![CDATA[METHOD PUBLIC IsAlarmInGroupOfZone : BOOL
+VAR_INPUT
+	nZoneId		: UDINT;
+	nGroupId	: UINT;
+END_VAR
+VAR
+	i	: UINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IsAlarmInGroupOfZone := FALSE;
+FOR i := 1 TO GVL_Diag.gnCountAlarms DO
+	
+	// Interface successfully assigned
+	IF GVL_Diag.gipAlarm[i] <> 0
+	AND_THEN GVL_Diag.gipAlarm[i].bActive
+	AND_THEN GVL_Diag.gipAlarm[i].nGetGroupId = nGroupId
+	AND GVL_Diag.gipAlarm[i].nGetSourceId = nZoneId THEN
+				
+		IsAlarmInGroupOfZone := TRUE;
+		
+	END_IF
+	
+END_FOR
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="IsAlarmInZone" Id="{26dbbb35-9c2c-4e12-b570-404639047d95}" FolderPath="Checks\">
+      <Declaration><![CDATA[METHOD PUBLIC IsAlarmInZone : BOOL
+VAR_INPUT
+	nZoneId	: UDINT;
+END_VAR
+VAR
+	i	: UINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+IsAlarmInZone := FALSE;
+FOR i := 1 TO GVL_Diag.gnCountAlarms DO
+	
+	// Interface successfully assigned
+	IF GVL_Diag.gipAlarm[i] <> 0
+	AND_THEN GVL_Diag.gipAlarm[i].bActive
+	AND_THEN GVL_Diag.gipAlarm[i].nGetSourceId = nZoneId THEN
+				
+		IsAlarmInZone := TRUE;
+			
+	END_IF
+	
+END_FOR
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="LanguageId" Id="{ff7e4497-e24d-44af-b1d0-49bb2d750bfb}">
+      <Declaration><![CDATA[METHOD PUBLIC LanguageId : HRESULT
+VAR_INPUT
+	sCurrentLanguage	: STRING;
+END_VAR
+VAR
+	i	: UINT;
+	hrChangeLang	:HRESULT;
+	bChangeLangPending	:BOOL;
+	bChangeLangSuccess	:BOOL;
+	bChangeLangError	:BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+// Set language
+IF sLanguage <> sCurrentLanguage THEN
+	IF sCurrentLanguage = 'de' OR sCurrentLanguage = 'DE' THEN
+		nLanguage := 1031;
+	ELSIF sCurrentLanguage = 'en' OR sCurrentLanguage = 'EN' OR sCurrentLanguage = 'gb' OR sCurrentLanguage = 'GB' THEN
+		nLanguage := 1033;
+	ELSIF sCurrentLanguage = 'cz' OR sCurrentLanguage = 'CZ' THEN
+		nLanguage := 1029;
+	END_IF
+	
+	sLanguage := sCurrentLanguage;
+	bChangeLanguage := TRUE;
+END_IF
+
+{warning 'TODO: Sprachenänderung realisieren'}
+IF bChangeLanguage AND FALSE THEN
+	// update text
+	
+	bChangeLangPending := FALSE;
+	bChangeLangSuccess := TRUE;
+	bChangeLangError := FALSE;
+	FOR i := 0 TO GVL_Diag.gnCountAlarms BY 1 DO
+		IF GVL_Diag.gipAlarm[i] <> 0 THEN
+			hrChangeLang := GVL_Diag.gipAlarm[i].UpdateText( nLanguage );
+			IF hrChangeLang = S_PENDING THEN
+				bChangeLangPending := TRUE;
+			END_IF
+			IF hrChangeLang = E_FAIL THEN
+				bChangeLangError := TRUE;
+			END_IF
+			IF hrChangeLang <> S_OK THEN
+				bChangeLangSuccess := FALSE;
+			END_IF
+		END_IF
+	END_FOR
+	
+	IF bChangeLangSuccess THEN
+		bChangeLanguage := FALSE;
+	END_IF
+	
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="UpdateEventTable" Id="{cefe359d-42d1-46d4-98da-fb3e900b7725}" FolderPath="private\">
+      <Declaration><![CDATA[METHOD PRIVATE UpdateEventTable : BOOL
+VAR_INPUT
+END_VAR
+VAR
+	i	: UINT;
+	j	: UINT;
+END_VAR
+VAR_INST
+    stEventEntryTemp: ST_EventEntryTable;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+// Init output table
+MEMSET( ADR( aEventEntryTable ), 0, SIZEOF( aEventEntryTable ) );
+j := 0;
+bAckRequested := FALSE;
+
+FOR i := 0 TO GVL_Diag.gnCountAlarms BY 1 DO
+	
+	// Interface successfully assigned and alarm is active
+	IF GVL_Diag.gipAlarm[i] <> 0
+	AND_THEN GVL_Diag.gipAlarm[i].bActive THEN
+		
+		// Acknowledge errors
+		IF rtAck.Q THEN
+			GVL_Diag.gipAlarm[i].Ack();
+		END_IF
+		
+		// reset _bSetEvent to check, if it will be set again
+		IF NOT GVL_Diag.gipAlarm[i].bSetEvent THEN
+			GVL_Diag.gipAlarm[i].bBlockAck := FALSE;
+		END_IF
+		GVL_Diag.gipAlarm[i].bSetEvent := FALSE;
+		
+		// if there is at least one acknowledgable alarm
+		bAckRequested S= NOT GVL_Diag.gipAlarm[i].bBlockAck AND GVL_Diag.gipAlarm[i].bActive;
+		
+		// update text
+		GVL_Diag.gipAlarm[i].UpdateText( nLanguage );
+		// GVL_Diag.gipEvent[i].GetJsonAttribute( stEventEntryTemp.sJsonAttribute, SIZEOF( stEventEntryTemp.sJsonAttribute ) );
+		
+		// fill table for HMI
+		IF j <= Parameter.nMaxEventEntries
+		AND_THEN ( ( GVL_Diag.gipAlarm[i].eSeverity = TcEventSeverity.Critical AND cfgShowErrors )
+			OR ( GVL_Diag.gipAlarm[i].eSeverity = TcEventSeverity.Error AND cfgShowErrors )
+			OR ( GVL_Diag.gipAlarm[i].eSeverity = TcEventSeverity.Warning AND cfgShowWarnings )
+			OR ( GVL_Diag.gipAlarm[i].eSeverity = TcEventSeverity.Info AND cfgShowInfos )
+			OR ( GVL_Diag.gipAlarm[i].eSeverity = TcEventSeverity.Verbose AND cfgShowInfos ) )
+		THEN
+			aEventEntryTable[j] := GVL_Diag.gipAlarm[i].GetEventEntry();
+			aEventEntryTable[j].bIsAlarm := TRUE;
+			j := j + 1;
+		END_IF
+		
+		// alarm reactions
+		CASE GVL_Diag.gipAlarm[i].eEventReaction OF
+			E_AlarmReaction.None:
+				;
+			E_AlarmReaction.Info:
+				bInfo := TRUE;
+			E_AlarmReaction.Warning:
+				bWarning := TRUE;
+			E_AlarmReaction.Verbose:
+				bVerbose := TRUE;
+			E_AlarmReaction.StopAtCycleEnd:
+				bStopAtCycleEnd := TRUE;
+			E_AlarmReaction.AbortGroup:
+				bAbortGroup := TRUE;
+				bError := TRUE;
+			E_AlarmReaction.AbortAll:
+				bAbortAll := TRUE;
+				bError := TRUE;
+			E_AlarmReaction.MediaOff:
+				bMediaOff := TRUE;
+				bError := TRUE;
+		ELSE
+			;
+		END_CASE
+
+		// severity critical is dominant
+		bError S= GVL_Diag.gipAlarm[i].eSeverity = TcEventSeverity.Critical;
+		
+	END_IF
+	
+END_FOR
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="UpdateLegacyTable" Id="{f515ef48-7bfc-421e-8d93-2a6d93103529}">
+      <Declaration><![CDATA[METHOD PRIVATE UpdateLegacyTable : ARRAY[1..80] OF ST_ReadEvent
+VAR_INPUT
+END_VAR
+VAR
+	i	: UINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+// Init output table
+MEMSET(ADR(UpdateLegacyTable),0,SIZEOF(UpdateLegacyTable));
+
+FOR i := 1 TO MIN( 80, Parameter.nMaxEventEntries + 1 ) BY 1 DO
+	
+	// Severity
+	CASE aEventEntryTable[i-1].eSeverity OF 
+		TcEventSeverity.Verbose :
+			UpdateLegacyTable[i].nClass := 0;
+		TcEventSeverity.Info :
+			UpdateLegacyTable[i].nClass := 4;
+		TcEventSeverity.Warning :
+			UpdateLegacyTable[i].nClass := 6; 
+		TcEventSeverity.Error :
+			UpdateLegacyTable[i].nClass := 7;
+		TcEventSeverity.Critical :
+			UpdateLegacyTable[i].nClass := 7;  
+	END_CASE
+	
+	// state of confirmation and reset
+	 CASE aEventEntryTable[i-1].eConfirmationState OF 
+		TcEventConfirmationState.NotSupported :
+			UpdateLegacyTable[i].nConfirmState := 0;
+			UpdateLegacyTable[i].nResetState := 0;
+			
+		TcEventConfirmationState.NotRequired :
+			UpdateLegacyTable[i].nConfirmState := 3;
+			UpdateLegacyTable[i].nResetState := 0;
+			
+		TcEventConfirmationState.WaitForConfirmation :
+			UpdateLegacyTable[i].nConfirmState := 1;
+			UpdateLegacyTable[i].nResetState := 1;
+
+		TcEventConfirmationState.Confirmed :
+			UpdateLegacyTable[i].nConfirmState := 4;
+			UpdateLegacyTable[i].nResetState := 3;
+			
+		TcEventConfirmationState.Reset :
+			UpdateLegacyTable[i].nConfirmState := 0;
+			UpdateLegacyTable[i].nResetState := 3;  
+	END_CASE
+				
+	// rest of data
+	UpdateLegacyTable[i].nEventId := aEventEntryTable[i-1].nEventId;
+	UpdateLegacyTable[i].sComputer := aEventEntryTable[i-1].EventClassName;
+	UpdateLegacyTable[i].sDate := LEFT( aEventEntryTable[i-1].sTimestamp, 10 );
+	UpdateLegacyTable[i].sMessageText := aEventEntryTable[i-1].sText;
+	UpdateLegacyTable[i].sSource := aEventEntryTable[i-1].sSourceName;
+	UpdateLegacyTable[i].nSourceId := aEventEntryTable[i-1].nSourceId;
+	UpdateLegacyTable[i].sTime := LEFT( DELETE( aEventEntryTable[i-1].sTimestamp, 11, 1 ), 8 );
+	
+END_FOR
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>
