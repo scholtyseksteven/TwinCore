@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
   <POU Name="FB_Signal" Id="{ca5e9833-d668-4649-b207-b6b71796880d}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK FB_Signal
@@ -26,14 +26,15 @@ END_VAR
 tonOnDebounce( IN := IN, PT := PT_on );
 tofOffDebounce( IN := tonOnDebounce.Q, PT := PT_off );
 
-// edges and representation of values
-RT := NOT tmpIN AND IN;
-FT := tmpIN AND NOT IN;
 Q := tofOffDebounce.Q;
-Q_stored S= Q;
 
-// store IN internally to avoid using R_TRIG and F_TRIG
-tmpIN := IN;
+// edges on debounced Q, not raw IN
+RT := NOT tmpIN AND Q;
+FT := tmpIN AND NOT Q;
+Q_Stored S= Q;
+
+// previous Q for next cycle
+tmpIN := Q;
 ]]></ST>
     </Implementation>
     <Method Name="ResetQS" Id="{6b70ddea-8b81-452d-b1a7-0f385a5a002c}">
@@ -45,7 +46,7 @@ END_VAR
       <Implementation>
         <ST><![CDATA[
 IF reset THEN
-	Q_stored := Q;
+	Q_Stored := FALSE;
 END_IF
 ]]></ST>
       </Implementation>
