@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
   <POU Name="FB_AnalogInputFilter" Id="{3b64030d-6082-4144-b9af-e5aaaa2fe77d}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK FB_AnalogInputFilter
@@ -27,9 +27,14 @@ END_VAR
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[
-// Faktor für die Gewichtung zwischen aktuellem und gespeicherten Wert
-// 0.01, da 1-0.99 wegen 99% als Ziel
-rFactor := 1 - LREAL_TO_REAL( EXPT(0.01, 1.0/rCycles) );
+// rCycles <= 0: pass-through (EXPT would explode at 1/0)
+IF rCycles <= 0 THEN
+	rFactor := 1;
+ELSE
+	// Faktor für die Gewichtung zwischen aktuellem und gespeicherten Wert
+	// 0.01, da 1-0.99 wegen 99% als Ziel
+	rFactor := 1 - LREAL_TO_REAL( EXPT(0.01, 1.0/rCycles) );
+END_IF
 ]]></ST>
       </Implementation>
     </Method>

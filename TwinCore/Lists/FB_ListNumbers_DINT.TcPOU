@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
   <POU Name="FB_ListNumbers_DINT" Id="{92e38839-df67-4137-87b1-1fac7451859a}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK FB_ListNumbers_DINT
@@ -20,16 +20,24 @@ END_VAR
     <Method Name="AddEntry" Id="{a8aa422c-aaa2-472d-843d-fe481267bdb7}">
       <Declaration><![CDATA[METHOD PUBLIC AddEntry : BOOL
 VAR_INPUT
-	entry	: UINT;
+	entry	: DINT;
 END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[
+AddEntry := FALSE;
+
+// last slot occupied -> would drop data; refuse
+IF asList[MAX_INDEX] <> 0 THEN
+	RETURN;
+END_IF
+
 // shift elements in array
 FOR i := MAX_INDEX - 1 TO 0 BY -1 DO
 	asList[i+1] := asList[i];
 END_FOR
 
 asList[0] := entry;
+AddEntry := TRUE;
 ]]></ST>
       </Implementation>
     </Method>
