@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
   <Itf Name="I_Alarm" Id="{8e76e599-22a0-4481-9636-6c66392ed652}">
     <Declaration><![CDATA[INTERFACE I_Alarm EXTENDS I_Message
@@ -35,6 +35,15 @@ END_VAR
       <Get Name="Get" Id="{3d053e87-8a37-4042-9952-4605ed774b8f}">
         <Declaration><![CDATA[]]></Declaration>
       </Get>
+    </Property>
+    <Property Name="ipNext" Id="{c3e8a1b4-6d2f-4f91-8a57-2b0c9e4d7f16}">
+      <Declaration><![CDATA[PROPERTY ipNext : I_Alarm]]></Declaration>
+      <Get Name="Get" Id="{d4f9b2c5-7e30-4082-9b68-3c1d0f5e8027}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+      <Set Name="Set" Id="{e50ac3d6-8f41-4193-ac79-4d2e106f9138}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Set>
     </Property>
     <Method Name="UpdateText" Id="{98a28c7f-2114-414b-a2aa-9fda16a6e173}">
       <Declaration><![CDATA[METHOD PUBLIC UpdateText : HRESULT
