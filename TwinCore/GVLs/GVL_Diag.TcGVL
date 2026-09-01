@@ -7,7 +7,7 @@ VAR_GLOBAL
 	gfbLogFile					: FB_LogFile;
 	gfbEventListener			: FB_EventListenerExtV2; // other HMI than TE2000
 	ipAlarmHead					: I_Alarm;	// singly linked list of all FB_Alarm instances
-	gnCountAlarms				: UINT := 3;	// 3 built-in alarms in FB_AlarmManagement; further instances self-register
+	gnCountAlarms				: UINT := 0;	// built-in and user FB_Alarm instances self-register in FB_init
 	gbCountAlarmsMaxExceeded	: BOOL := FALSE;
 	gbInterfaceNotAssigned		: BOOL := FALSE;
 	
