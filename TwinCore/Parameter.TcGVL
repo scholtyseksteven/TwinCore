@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
   <GVL Name="Parameter" Id="{c6b470c0-640d-46d1-99a6-d64549d18cfc}" ParameterList="True">
     <Declaration><![CDATA[{attribute 'qualified_only'}
@@ -8,7 +8,7 @@ VAR_GLOBAL CONSTANT
 	
 	
 	// Alarm Management
-	nMaxNumberAlarms		: UINT := 2000;	// max. number of FB_Alarm or FB_Event instances in the project (combined)
+	nMaxNumberAlarms		: UINT := 2000;	// safety cap for FB_Alarm linked-list registration (not an array size)
 	
 	// Logger
 	MAX_LOG_STRING_SIZE		: UINT := 1000;	// maximal string size for one log entry (line)
