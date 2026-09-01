@@ -1,10 +1,11 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
   <POU Name="FB_Alarm" Id="{9ad75833-ec6e-4f0e-b6e0-1de1dd98cb7a}" SpecialFunc="None">
     <Declaration><![CDATA[//Usage description
 //-----------------
 //| This FB uses the FB_init, which needs to be initialized within the declaration!
 //| Also it can use the method Initialization, to specify Group/Zone IDs of the Event. Here you can also change the alarm reaction
+//| FB_init / Initialize prepend this instance onto GVL_Diag.ipAlarmHead (linked list, no GVL table).
 //| use SetEvent[...] -methods to raise an alarm!
 //| 
 //| You can trigger an alarm once or use it cyclically.
@@ -32,7 +33,7 @@ VAR
 	
 	_stEventClass	: TcEventEntry;
 	_eEventReaction	: E_AlarmReaction;
-	_nInterfaceIndex: UINT;
+	_ipNext			: I_Alarm;
 	_nArgumentCount: UDINT;
 	
 	hrRaise	: HRESULT;
@@ -187,12 +188,39 @@ END_VAR
 VAR_INPUT
 	bInCopyCode : BOOL;  // if TRUE, the instance afterwards gets moved into the copy code (online change)
 END_VAR
+VAR
+	ipThis	: I_Alarm;
+	ipPrev	: I_Alarm;
+	nGuard	: UINT;
+END_VAR
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[IF NOT bInCopyCode THEN
 	THIS^.fbTcAlarm.ipArguments.Clear();
 	THIS^.fbTcAlarm.Release();
-	GVL_Diag.gipAlarm[_nInterfaceIndex] := 0;
+	
+	ipThis := THIS^;
+	IF GVL_Diag.ipAlarmHead = ipThis THEN
+		GVL_Diag.ipAlarmHead := _ipNext;
+		IF GVL_Diag.gnCountAlarms > 0 THEN
+			GVL_Diag.gnCountAlarms := GVL_Diag.gnCountAlarms - 1;
+		END_IF
+	ELSE
+		ipPrev := GVL_Diag.ipAlarmHead;
+		nGuard := 0;
+		WHILE ipPrev <> 0 AND nGuard < Parameter.nMaxNumberAlarms DO
+			nGuard := nGuard + 1;
+			IF ipPrev.ipNext = ipThis THEN
+				ipPrev.ipNext := _ipNext;
+				IF GVL_Diag.gnCountAlarms > 0 THEN
+					GVL_Diag.gnCountAlarms := GVL_Diag.gnCountAlarms - 1;
+				END_IF
+				EXIT;
+			END_IF
+			ipPrev := ipPrev.ipNext;
+		END_WHILE
+	END_IF
+	_ipNext := 0;
 END_IF
 ]]></ST>
       </Implementation>
@@ -239,14 +267,44 @@ IF NOT bInCopyCode THEN
 			_bWithConfirmation,
 			THIS^._fbInternalSourceInfo );
 		
-		GVL_Diag.gipAlarm[GVL_Diag.gnCountAlarms] := THIS^;
-		
-		_nInterfaceIndex := GVL_Diag.gnCountAlarms;
-		GVL_Diag.gnCountAlarms := GVL_Diag.gnCountAlarms + 1;
+		Register();
 		
 	END_IF
 	
 END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Register" Id="{294e071a-c385-45d7-e0bd-816254a3d57c}" FolderPath="Implicit\">
+      <Declaration><![CDATA[METHOD PRIVATE Register : BOOL
+VAR
+	ipAlarm	: I_Alarm;
+	ipThis	: I_Alarm;
+	nGuard	: UINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+ipThis := THIS^;
+
+ipAlarm := GVL_Diag.ipAlarmHead;
+nGuard := 0;
+WHILE ipAlarm <> 0 AND nGuard < Parameter.nMaxNumberAlarms DO
+	IF ipAlarm = ipThis THEN
+		RETURN;
+	END_IF
+	ipAlarm := ipAlarm.ipNext;
+	nGuard := nGuard + 1;
+END_WHILE
+
+IF GVL_Diag.gnCountAlarms >= Parameter.nMaxNumberAlarms THEN
+	GVL_Diag.gbCountAlarmsMaxExceeded := TRUE;
+	RETURN;
+END_IF
+
+_ipNext := GVL_Diag.ipAlarmHead;
+GVL_Diag.ipAlarmHead := ipThis;
+GVL_Diag.gnCountAlarms := GVL_Diag.gnCountAlarms + 1;
 ]]></ST>
       </Implementation>
     </Method>
@@ -376,6 +434,7 @@ END_VAR
 THIS^.nZoneId := nTmpZoneId;
 THIS^.nGroupId := nTmpGroupId;
 THIS^._eEventReaction := eInEventReaction;
+Register();
 ]]></ST>
       </Implementation>
     </Method>
@@ -389,6 +448,25 @@ END_VAR
           <ST><![CDATA[ipArguments := THIS^.fbTcAlarm.ipArguments;]]></ST>
         </Implementation>
       </Get>
+    </Property>
+    <Property Name="ipNext" Id="{f61bd4e7-9052-42a4-bd8a-5e3f2170a249}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY ipNext : I_Alarm]]></Declaration>
+      <Get Name="Get" Id="{072ce5f8-a163-43b5-ce9b-6f403281b35a}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ipNext := _ipNext;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{183df609-b274-44c6-dfac-70514392c46b}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_ipNext := ipNext;]]></ST>
+        </Implementation>
+      </Set>
     </Property>
     <Property Name="LogEntry" Id="{1fd9fc8e-f219-43b0-a85b-d2d1da1f2112}" FolderPath="Properties\">
       <Declaration><![CDATA[PROPERTY PUBLIC LogEntry : ST_LogEntry]]></Declaration>
