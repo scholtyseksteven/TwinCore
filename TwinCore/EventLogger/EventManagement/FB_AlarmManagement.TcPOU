@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.18">
   <POU Name="FB_AlarmManagement" Id="{d0dc2317-916a-4429-b902-8a8f5746e49a}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK FB_AlarmManagement
@@ -118,9 +118,7 @@ END_VAR
       <Implementation>
         <ST><![CDATA[
 IF NOT bInCopyCode THEN
-	GVL_Diag.gipAlarm[0] := 0;
-	GVL_Diag.gipAlarm[1] := 0;
-	GVL_Diag.gipAlarm[2] := 0;
+	; // each nested FB_Alarm.FB_exit unlinks itself from ipAlarmHead
 END_IF
 ]]></ST>
       </Implementation>
@@ -229,10 +227,6 @@ fbWrnTooManyAlarms.Initialize( 0, 0, E_AlarmReaction.Warning );
 fbErrInterfaceNotAssigned.Initialize( 0, 0, E_AlarmReaction.AbortAll );
 fbWrnArgumentBeforeInit.Initialize( 0, 0, E_AlarmReaction.Warning );
 
-GVL_Diag.gipAlarm[0] := fbWrnTooManyAlarms;
-GVL_Diag.gipAlarm[1] := fbErrInterfaceNotAssigned;
-GVL_Diag.gipAlarm[2] := fbWrnArgumentBeforeInit;
-
 bInit := FALSE;
 ]]></ST>
       </Implementation>
@@ -261,23 +255,23 @@ VAR_INPUT
 	nGroupId	: UINT;
 END_VAR
 VAR
-	i	: UINT;
+	ipAlarm	: I_Alarm;
+	nGuard	: UINT;
 END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[
 IsAlarmInGroup := FALSE;
-FOR i := 1 TO GVL_Diag.gnCountAlarms DO
-	
-	// Interface successfully assigned
-	IF GVL_Diag.gipAlarm[i] <> 0
-	AND_THEN GVL_Diag.gipAlarm[i].bActive
-	AND_THEN GVL_Diag.gipAlarm[i].nGetGroupId = nGroupId THEN
-			
+ipAlarm := GVL_Diag.ipAlarmHead;
+nGuard := 0;
+WHILE ipAlarm <> 0 AND nGuard < Parameter.nMaxNumberAlarms DO
+	nGuard := nGuard + 1;
+	IF ipAlarm.bActive
+	AND_THEN ipAlarm.nGetGroupId = nGroupId THEN
 		IsAlarmInGroup := TRUE;
-		
+		RETURN;
 	END_IF
-	
-END_FOR
+	ipAlarm := ipAlarm.ipNext;
+END_WHILE
 ]]></ST>
       </Implementation>
     </Method>
@@ -288,24 +282,24 @@ VAR_INPUT
 	nGroupId	: UINT;
 END_VAR
 VAR
-	i	: UINT;
+	ipAlarm	: I_Alarm;
+	nGuard	: UINT;
 END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[
 IsAlarmInGroupOfZone := FALSE;
-FOR i := 1 TO GVL_Diag.gnCountAlarms DO
-	
-	// Interface successfully assigned
-	IF GVL_Diag.gipAlarm[i] <> 0
-	AND_THEN GVL_Diag.gipAlarm[i].bActive
-	AND_THEN GVL_Diag.gipAlarm[i].nGetGroupId = nGroupId
-	AND GVL_Diag.gipAlarm[i].nGetSourceId = nZoneId THEN
-				
+ipAlarm := GVL_Diag.ipAlarmHead;
+nGuard := 0;
+WHILE ipAlarm <> 0 AND nGuard < Parameter.nMaxNumberAlarms DO
+	nGuard := nGuard + 1;
+	IF ipAlarm.bActive
+	AND_THEN ipAlarm.nGetGroupId = nGroupId
+	AND ipAlarm.nGetSourceId = nZoneId THEN
 		IsAlarmInGroupOfZone := TRUE;
-		
+		RETURN;
 	END_IF
-	
-END_FOR
+	ipAlarm := ipAlarm.ipNext;
+END_WHILE
 ]]></ST>
       </Implementation>
     </Method>
@@ -315,23 +309,23 @@ VAR_INPUT
 	nZoneId	: UDINT;
 END_VAR
 VAR
-	i	: UINT;
+	ipAlarm	: I_Alarm;
+	nGuard	: UINT;
 END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[
 IsAlarmInZone := FALSE;
-FOR i := 1 TO GVL_Diag.gnCountAlarms DO
-	
-	// Interface successfully assigned
-	IF GVL_Diag.gipAlarm[i] <> 0
-	AND_THEN GVL_Diag.gipAlarm[i].bActive
-	AND_THEN GVL_Diag.gipAlarm[i].nGetSourceId = nZoneId THEN
-				
+ipAlarm := GVL_Diag.ipAlarmHead;
+nGuard := 0;
+WHILE ipAlarm <> 0 AND nGuard < Parameter.nMaxNumberAlarms DO
+	nGuard := nGuard + 1;
+	IF ipAlarm.bActive
+	AND_THEN ipAlarm.nGetSourceId = nZoneId THEN
 		IsAlarmInZone := TRUE;
-			
+		RETURN;
 	END_IF
-	
-END_FOR
+	ipAlarm := ipAlarm.ipNext;
+END_WHILE
 ]]></ST>
       </Implementation>
     </Method>
@@ -341,7 +335,8 @@ VAR_INPUT
 	sCurrentLanguage	: STRING;
 END_VAR
 VAR
-	i	: UINT;
+	ipAlarm	: I_Alarm;
+	nGuard	: UINT;
 	hrChangeLang	:HRESULT;
 	bChangeLangPending	:BOOL;
 	bChangeLangSuccess	:BOOL;
@@ -371,20 +366,22 @@ IF bChangeLanguage AND FALSE THEN
 	bChangeLangPending := FALSE;
 	bChangeLangSuccess := TRUE;
 	bChangeLangError := FALSE;
-	FOR i := 0 TO GVL_Diag.gnCountAlarms BY 1 DO
-		IF GVL_Diag.gipAlarm[i] <> 0 THEN
-			hrChangeLang := GVL_Diag.gipAlarm[i].UpdateText( nLanguage );
-			IF hrChangeLang = S_PENDING THEN
-				bChangeLangPending := TRUE;
-			END_IF
-			IF hrChangeLang = E_FAIL THEN
-				bChangeLangError := TRUE;
-			END_IF
-			IF hrChangeLang <> S_OK THEN
-				bChangeLangSuccess := FALSE;
-			END_IF
+	ipAlarm := GVL_Diag.ipAlarmHead;
+	nGuard := 0;
+	WHILE ipAlarm <> 0 AND nGuard < Parameter.nMaxNumberAlarms DO
+		nGuard := nGuard + 1;
+		hrChangeLang := ipAlarm.UpdateText( nLanguage );
+		IF hrChangeLang = S_PENDING THEN
+			bChangeLangPending := TRUE;
 		END_IF
-	END_FOR
+		IF hrChangeLang = E_FAIL THEN
+			bChangeLangError := TRUE;
+		END_IF
+		IF hrChangeLang <> S_OK THEN
+			bChangeLangSuccess := FALSE;
+		END_IF
+		ipAlarm := ipAlarm.ipNext;
+	END_WHILE
 	
 	IF bChangeLangSuccess THEN
 		bChangeLanguage := FALSE;
@@ -398,8 +395,9 @@ END_IF]]></ST>
 VAR_INPUT
 END_VAR
 VAR
-	i	: UINT;
-	j	: UINT;
+	ipAlarm	: I_Alarm;
+	j		: UINT;
+	nGuard	: UINT;
 END_VAR
 VAR_INST
     stEventEntryTemp: ST_EventEntryTable;
@@ -411,45 +409,46 @@ MEMSET( ADR( aEventEntryTable ), 0, SIZEOF( aEventEntryTable ) );
 j := 0;
 bAckRequested := FALSE;
 
-FOR i := 0 TO GVL_Diag.gnCountAlarms BY 1 DO
+ipAlarm := GVL_Diag.ipAlarmHead;
+nGuard := 0;
+WHILE ipAlarm <> 0 AND nGuard < Parameter.nMaxNumberAlarms DO
+	nGuard := nGuard + 1;
 	
-	// Interface successfully assigned and alarm is active
-	IF GVL_Diag.gipAlarm[i] <> 0
-	AND_THEN GVL_Diag.gipAlarm[i].bActive THEN
+	// alarm is active
+	IF ipAlarm.bActive THEN
 		
 		// Acknowledge errors
 		IF rtAck.Q THEN
-			GVL_Diag.gipAlarm[i].Ack();
+			ipAlarm.Ack();
 		END_IF
 		
 		// reset _bSetEvent to check, if it will be set again
-		IF NOT GVL_Diag.gipAlarm[i].bSetEvent THEN
-			GVL_Diag.gipAlarm[i].bBlockAck := FALSE;
+		IF NOT ipAlarm.bSetEvent THEN
+			ipAlarm.bBlockAck := FALSE;
 		END_IF
-		GVL_Diag.gipAlarm[i].bSetEvent := FALSE;
+		ipAlarm.bSetEvent := FALSE;
 		
 		// if there is at least one acknowledgable alarm
-		bAckRequested S= NOT GVL_Diag.gipAlarm[i].bBlockAck AND GVL_Diag.gipAlarm[i].bActive;
+		bAckRequested S= NOT ipAlarm.bBlockAck AND ipAlarm.bActive;
 		
 		// update text
-		GVL_Diag.gipAlarm[i].UpdateText( nLanguage );
-		// GVL_Diag.gipEvent[i].GetJsonAttribute( stEventEntryTemp.sJsonAttribute, SIZEOF( stEventEntryTemp.sJsonAttribute ) );
+		ipAlarm.UpdateText( nLanguage );
 		
 		// fill table for HMI
 		IF j <= Parameter.nMaxEventEntries
-		AND_THEN ( ( GVL_Diag.gipAlarm[i].eSeverity = TcEventSeverity.Critical AND cfgShowErrors )
-			OR ( GVL_Diag.gipAlarm[i].eSeverity = TcEventSeverity.Error AND cfgShowErrors )
-			OR ( GVL_Diag.gipAlarm[i].eSeverity = TcEventSeverity.Warning AND cfgShowWarnings )
-			OR ( GVL_Diag.gipAlarm[i].eSeverity = TcEventSeverity.Info AND cfgShowInfos )
-			OR ( GVL_Diag.gipAlarm[i].eSeverity = TcEventSeverity.Verbose AND cfgShowInfos ) )
+		AND_THEN ( ( ipAlarm.eSeverity = TcEventSeverity.Critical AND cfgShowErrors )
+			OR ( ipAlarm.eSeverity = TcEventSeverity.Error AND cfgShowErrors )
+			OR ( ipAlarm.eSeverity = TcEventSeverity.Warning AND cfgShowWarnings )
+			OR ( ipAlarm.eSeverity = TcEventSeverity.Info AND cfgShowInfos )
+			OR ( ipAlarm.eSeverity = TcEventSeverity.Verbose AND cfgShowInfos ) )
 		THEN
-			aEventEntryTable[j] := GVL_Diag.gipAlarm[i].GetEventEntry();
+			aEventEntryTable[j] := ipAlarm.GetEventEntry();
 			aEventEntryTable[j].bIsAlarm := TRUE;
 			j := j + 1;
 		END_IF
 		
 		// alarm reactions
-		CASE GVL_Diag.gipAlarm[i].eEventReaction OF
+		CASE ipAlarm.eEventReaction OF
 			E_AlarmReaction.None:
 				;
 			E_AlarmReaction.Info:
@@ -474,11 +473,12 @@ FOR i := 0 TO GVL_Diag.gnCountAlarms BY 1 DO
 		END_CASE
 
 		// severity critical is dominant
-		bError S= GVL_Diag.gipAlarm[i].eSeverity = TcEventSeverity.Critical;
+		bError S= ipAlarm.eSeverity = TcEventSeverity.Critical;
 		
 	END_IF
 	
-END_FOR
+	ipAlarm := ipAlarm.ipNext;
+END_WHILE
 ]]></ST>
       </Implementation>
     </Method>
